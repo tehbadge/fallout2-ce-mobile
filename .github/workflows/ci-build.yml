@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - ios-port
   pull_request:
     types:
       - opened
       - synchronize
+      - reopened
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
@@ -21,6 +23,23 @@ defaults:
     shell: bash
 
 jobs:
+  regression:
+    name: Host regressions
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libsdl2-dev zlib1g-dev python3
+      - name: Configure assertion-enabled host tests
+        run: cmake -S . -B out/regression -DCMAKE_BUILD_TYPE=Debug -DFALLOUT_VENDORED=OFF
+      - name: Build regression executables
+        run: cmake --build out/regression --target regression_tests --parallel 2
+      - name: Run regressions
+        run: ctest --test-dir out/regression --verbose --no-tests=error
+
   static-analysis:
     name: Static analysis
 
@@ -153,12 +172,8 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Cache cmake build
-        uses: actions/cache@v4
-        with:
-          path: out
-          key: ios-cmake-v101
-
+      # Configure from fresh dependencies; do not restore patched source or
+      # generated Xcode projects from a fixed whole-build-tree cache.
       # Unsigned: the build only checks it compiles (signing needs a team).
       - name: Configure
         run: |

@@ -53,6 +53,10 @@ void muiDrawEnd();
 // Frees textures (renderer is going away).
 void muiDrawReset();
 
+// A screen is being pushed: its image versions may repeat an earlier screen's.
+// Invalidate indexed/RGBA pixels without destroying textures or cached game art.
+void muiInvalidateImageTextures();
+
 // Changes when textures are dropped (renderer reset): textures made
 // outside of the caches here must be made again.
 unsigned int muiDrawGeneration();

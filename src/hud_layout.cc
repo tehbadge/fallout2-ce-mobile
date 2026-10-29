@@ -9,6 +9,10 @@
 #include <jni.h>
 #endif
 
+#ifdef __IPHONEOS__
+#include "platform/ios/display_metrics.h"
+#endif
+
 #include "settings.h"
 #include "svga.h"
 
@@ -60,6 +64,22 @@ static const HudLayout kLandscapeLayout = {
 
 const HudLayout& hudLayoutLandscape()
 {
+#ifdef __IPHONEOS__
+    if (settings.touch.game_menu_quick_actions) {
+        static const HudLayout compact = [] {
+            HudLayout layout = kLandscapeLayout;
+            for (auto& group : layout.groups) {
+                for (auto& line : group.lines) {
+                    line.erase(std::remove_if(line.begin(), line.end(), [](const HudElementSpec& element) {
+                        return element.id == HudElementId::QuickSave || element.id == HudElementId::QuickLoad;
+                    }), line.end());
+                }
+            }
+            return layout;
+        }();
+        return compact;
+    }
+#endif
     return kLandscapeLayout;
 }
 
@@ -76,6 +96,13 @@ float hudGetScreenDensity()
         return ddpi / 160.0f;
     }
     return 2.0f;
+#elif defined(__IPHONEOS__)
+    auto geometry = iosDisplayMetricsGet();
+    if (geometry.valid) {
+        // A scalar control size must fit both measured drawable axes.
+        return std::min(geometry.pixelsPerPointX, geometry.pixelsPerPointY);
+    }
+    return 1.0f;
 #else
     return 1.0f;
 #endif
@@ -187,11 +214,21 @@ HudMetrics hudMetricsGet()
     metrics.screenWidth = screenGetWidth();
     metrics.screenHeight = screenGetHeight();
 
+#ifndef __IPHONEOS__
     int outputWidth;
     int outputHeight;
     float outputScale = hudGetOutputScale(&outputWidth, &outputHeight);
+#endif
     metrics.pixelsPerDp = hudGetPixelsPerDp();
 
+#ifdef __IPHONEOS__
+    int iosInsets[4];
+    iosDisplayLogicalSafeInsets(iosDisplayMetricsGet(), iosInsets);
+    metrics.insetLeft = iosInsets[0];
+    metrics.insetTop = iosInsets[1];
+    metrics.insetRight = iosInsets[2];
+    metrics.insetBottom = iosInsets[3];
+#else
     // Cutout insets to logical pixels, minus letterbox bars of logical size.
     int insets[4];
     hudGetSafeInsets(insets);
@@ -201,6 +238,7 @@ HudMetrics hudMetricsGet()
     metrics.insetTop = static_cast<int>(std::ceil(std::max(insets[1] - barY, 0) / outputScale));
     metrics.insetRight = static_cast<int>(std::ceil(std::max(insets[2] - barX, 0) / outputScale));
     metrics.insetBottom = static_cast<int>(std::ceil(std::max(insets[3] - barY, 0) / outputScale));
+#endif
     return metrics;
 }
 

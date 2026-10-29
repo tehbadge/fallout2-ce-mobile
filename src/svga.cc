@@ -24,10 +24,15 @@
 #include "settings.h"
 #include "text_font.h"
 #include "tile.h"
+#include "touch.h"
 #include "win32.h"
 #include "window_manager.h"
 #include "window_manager_private.h"
 #include "world_view.h"
+
+#ifdef __IPHONEOS__
+#include "platform/ios/crt_renderer.h"
+#endif
 
 namespace fallout {
 
@@ -136,7 +141,7 @@ int _GNW95_init_mode_ex(int width, int height, int bpp)
     height = settings.screen.resolution_y;
     int scale = settings.screen.scale;
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) || (defined(__IPHONEOS__) && FALLOUT_TOUCH_ONLY)
     // CE: The phone's screen decides: the game's 480 lines (the original's
     // height, what the mobile UI is laid out against) and as many columns as
     // the screen's proportions give, full screen. A config copied from a
@@ -542,6 +547,10 @@ static bool createRenderer(int width, int height)
         return false;
     }
 
+#ifdef __IPHONEOS__
+    iosCrtInit(gSdlRenderer);
+#endif
+
     if (SDL_RenderSetLogicalSize(gSdlRenderer, width, height) != 0) {
         return false;
     }
@@ -571,6 +580,9 @@ static bool createRenderer(int width, int height)
 
 static void destroyRenderer()
 {
+#ifdef __IPHONEOS__
+    iosCrtReset();
+#endif
     worldViewResetRenderer();
     muiResetRenderer();
 
@@ -696,9 +708,15 @@ void renderPresent()
     }
     // render movie SDL texture if present
     movieRenderDirectOverlay();
+#ifdef __IPHONEOS__
+    iosCrtDraw(gSdlRenderer, false);
+#endif
     perfMonitorMark(&perf.uiStart);
     muiRender(gSdlRenderer);
     perfMonitorMark(&perf.uiEnd);
+#ifdef __IPHONEOS__
+    iosCrtDraw(gSdlRenderer, true);
+#endif
     devAutotestPump();
     devAutotestCapture(gSdlRenderer);
     SDL_RenderPresent(gSdlRenderer);

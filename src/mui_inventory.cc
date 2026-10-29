@@ -1173,8 +1173,12 @@ namespace {
         };
         for (int index = 0; index < 3; index++) {
             InventorySlot targetSlot = static_cast<InventorySlot>(index + 1);
-            if (targetSlot != slot && ui.dropped(slotRects[index], nullptr)) {
-                move(item, slot, slotTargets[index], nullptr);
+            if (ui.dropped(slotRects[index], nullptr)) {
+                // Releasing on the source slot cancels, even if the floating
+                // preview overlaps another equipment slot.
+                if (targetSlot != slot) {
+                    move(item, slot, slotTargets[index], nullptr);
+                }
                 return;
             }
         }
@@ -1207,6 +1211,23 @@ namespace {
 
         if (slot != InventorySlot::None && ui.dropped(listRect, nullptr)) {
             move(item, slot, InventoryDropTarget::Backpack, nullptr);
+            return;
+        }
+
+        // Only an unconsumed release reaches the preview fallback. Keep the
+        // same slot order and engine eligibility checks as finger targeting.
+        const MuiRect preview = muiDraggedItemRect(ui);
+        for (int index = 0; index < 3; index++) {
+            MuiRect target = slotRects[index];
+            target.x += ui.pointerX() - preview.centerX();
+            target.y += ui.pointerY() - preview.centerY();
+            if (ui.dropped(target, nullptr)) {
+                InventorySlot targetSlot = static_cast<InventorySlot>(index + 1);
+                if (targetSlot != slot) {
+                    move(item, slot, slotTargets[index], nullptr);
+                }
+                return;
+            }
         }
     }
 

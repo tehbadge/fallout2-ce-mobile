@@ -9,6 +9,13 @@
 #include "fps_limiter.h"
 #include "game.h"
 #include "input.h"
+#ifdef __IPHONEOS__
+#include "game_commands.h"
+#include "interface.h"
+#include "mui_icons.h"
+#include "settings.h"
+#include "touch_hud.h"
+#endif
 #include "kb.h"
 #include "loadsave.h"
 #include "map.h"
@@ -23,6 +30,10 @@ namespace fallout {
 namespace {
 
     // Texts in `game\ce.msg`.
+#ifdef __IPHONEOS__
+    constexpr int kTextQuickSave = 497;
+    constexpr int kTextQuickLoad = 498;
+#endif
     constexpr int kTextContinue = 214;
     constexpr int kTextSaveGame = 215;
     constexpr int kTextLoadGame = 216;
@@ -41,6 +52,10 @@ namespace {
             Load,
             Settings,
             Exit,
+#ifdef __IPHONEOS__
+            QuickSave,
+            QuickLoad,
+#endif
         };
 
         GameMenuScreen(bool saveLoad, const std::u32string* place)
@@ -130,9 +145,22 @@ namespace {
             }
         }
 
+#ifdef __IPHONEOS__
+        bool quickActions = saveLoad && settings.touch.game_menu_quick_actions;
+#else
+        constexpr bool quickActions = false;
+#endif
         float buttonHeight = std::min(ui.dp(44.0f), (safe.h - padding * 2.0f - headerHeight - gap * (buttonCount - 1)) / buttonCount);
+        // Only the optional row needs scrolling; retain the original fitting
+        // menu exactly when it is absent. Never shrink the added touch targets.
+        if (quickActions) buttonHeight = ui.dp(44.0f);
         float width = std::min(safe.w, ui.dp(312.0f));
         float height = padding * 2.0f + headerHeight + buttonHeight * buttonCount + gap * (buttonCount - 1);
+        float contentHeight = height - padding * 2.0f - headerHeight;
+        if (quickActions) {
+            contentHeight += buttonHeight + gap;
+            height = std::min(safe.h, height + buttonHeight + gap);
+        }
         MuiRect card = { safe.centerX() - width / 2.0f, safe.centerY() - height / 2.0f, width, height };
 
         if (ui.tappedOutside(card)) {
@@ -155,12 +183,19 @@ namespace {
         muiDrawTextAligned(hasPlace ? place : muiPlaceText(mapGetCurrentMap(), gElevation), placeRect, ui.dp(12.0f), theme.textDim, MuiAlign::Start, MuiAlign::Center);
         muiDrawTextAligned(muiDecodeUtf8(date), dateRect, ui.dp(11.0f), theme.textDim, MuiAlign::End, MuiAlign::Center);
 
+        MuiContext buttonsUi = ui;
+        MuiRect viewport = { header.x, header.bottom(), header.w, card.bottom() - padding - header.bottom() };
         float y = header.bottom();
+        if (quickActions) {
+            y -= ui.scroll("menu", viewport, contentHeight);
+            muiPushClip(viewport);
+            buttonsUi.isInteractive = ui.interactive() && viewport.contains(ui.pointerX(), ui.pointerY());
+        }
         for (int index = 0; index < buttonCount; index++) {
             const Button& button = *buttons[index];
             MuiRect rect = { header.x, y, header.w, buttonHeight };
             MuiButtonStyle style = button.action == Action::None ? MuiButtonStyle::Primary : MuiButtonStyle::Normal;
-            if (ui.button(button.id, rect, muiDecodeGameText(muiText(button.textId, button.fallback)), style)) {
+            if (buttonsUi.button(button.id, rect, muiDecodeGameText(muiText(button.textId, button.fallback)), style)) {
                 if (button.action == Action::None) {
                     back();
                 } else {
@@ -168,7 +203,35 @@ namespace {
                 }
             }
             y += buttonHeight + gap;
+#ifdef __IPHONEOS__
+            if (quickActions && button.action == Action::None) {
+                MuiContext quickUi = buttonsUi;
+                quickUi.isInteractive = buttonsUi.interactive() && interfaceBarEnabled();
+                float halfWidth = (header.w - gap) / 2.0f;
+                for (int quickIndex = 0; quickIndex < 2; quickIndex++) {
+                    MuiRect quickRect = { header.x + quickIndex * (halfWidth + gap), y, halfWidth, buttonHeight };
+                    if (quickUi.button(quickIndex == 0 ? "menu.quick_save" : "menu.quick_load", quickRect, U"")) {
+                        pending = quickIndex == 0 ? Action::QuickSave : Action::QuickLoad;
+                    }
+                    // Reuse the normal button's frame and pressed feedback;
+                    // center its existing icon and fitted label as one group.
+                    std::u32string label = muiDecodeGameText(quickIndex == 0
+                            ? muiText(kTextQuickSave, "Quick Save") : muiText(kTextQuickLoad, "Quick Load"));
+                    float iconSize = ui.dp(20.0f);
+                    float labelSize = muiFitTextSize(label, quickRect.w - ui.dp(16.0f) - iconSize - gap,
+                        ui.dp(theme.buttonTextSize), ui.dp(10.0f));
+                    float textWidth = muiTextWidth(label, labelSize);
+                    float x = quickRect.centerX() - (iconSize + gap + textWidth) / 2.0f;
+                    muiDrawIcon(quickIndex == 0 ? MuiIcon::QuickSave : MuiIcon::QuickLoad,
+                        x + iconSize / 2.0f, quickRect.centerY(), iconSize, theme.buttonText);
+                    MuiRect labelRect = { x + iconSize + gap, quickRect.y, textWidth, quickRect.h };
+                    muiDrawTextAligned(label, labelRect, labelSize, theme.buttonText, MuiAlign::Start, MuiAlign::Center);
+                }
+                y += buttonHeight + gap;
+            }
+#endif
         }
+        if (quickActions) muiPopClip();
     }
 
 } // namespace
@@ -219,6 +282,9 @@ int muiGameMenuRun(bool saveLoad, const std::u32string* place)
 
     // As the game's window: 1 - a game was saved or loaded.
     int result = 0;
+#ifdef __IPHONEOS__
+    GameCommandType deferred = GameCommandType::None;
+#endif
     while (!screen.finished) {
         sharedFpsLimiter.mark();
 
@@ -258,6 +324,26 @@ int muiGameMenuRun(bool saveLoad, const std::u32string* place)
         case GameMenuScreen::Action::Exit:
             showQuitConfirmationDialog();
             break;
+#ifdef __IPHONEOS__
+        case GameMenuScreen::Action::QuickSave:
+            if (saveLoad && interfaceBarEnabled()) {
+                deferred = GameCommandType::QuickSave;
+                screen.finished = true;
+            }
+            break;
+        case GameMenuScreen::Action::QuickLoad: {
+            // Remove the menu before the modal question. Cancellation restores
+            // the same screen (and its scroll); no load runs inside either UI.
+            muiRemove(&screen);
+            bool accepted = saveLoad && touchHudConfirmQuickLoad();
+            muiPush(&screen);
+            if (accepted) {
+                deferred = GameCommandType::QuickLoad;
+                screen.finished = true;
+            }
+            break;
+        }
+#endif
         case GameMenuScreen::Action::None:
             break;
         }
@@ -266,6 +352,11 @@ int muiGameMenuRun(bool saveLoad, const std::u32string* place)
     }
 
     muiRemove(&screen);
+#ifdef __IPHONEOS__
+    if (deferred != GameCommandType::None && _game_user_wants_to_quit == GAME_QUIT_REQUEST_NONE) {
+        gameCommandPost(deferred);
+    }
+#endif
     return result;
 }
 

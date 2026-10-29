@@ -203,7 +203,8 @@ enum DevAutotestAction {
     // Mobile UI: tap on widget `widget` (a = 1 - quick tap, finger up in the
     // same frame).
     DEV_AUTOTEST_ACTION_MUI_TAP,
-    // Mobile UI: drag from widget `widget` to widget `target`.
+    // Mobile UI: drag from widget `widget` to widget `target`; (a, b) offsets
+    // the release in normalized screen units (zero keeps the target center).
     DEV_AUTOTEST_ACTION_MUI_DRAG,
     // Holds HUD element `a` for `b` frames, captures "<name>_held" before
     // the finger goes up.
@@ -1920,6 +1921,29 @@ static const DevAutotestStep kDevAutotestNewGameElderSteps[] = {
     { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 30, "ve04_frame" },
 };
 
+// Display geometry smoke check from the title, without loading/saving a game
+// or editing preferences. Repeat Back taps to catch stale safe-area hitboxes.
+#define DISPLAY_BACK_CYCLE(n) \
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "dg" #n "_settings", "mainmenu.settings" }, \
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "dg" #n "_back_present", "prefs.back" }, \
+    { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 20, "dg" #n "_back", "prefs.back" }, \
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "dg" #n "_closed", "prefs.back" },
+static const DevAutotestStep kDevAutotestDisplayGeometrySteps[] = {
+    { DEV_AUTOTEST_ACTION_NONE, 0, 0, 0, 120, "dg00_title" },
+    { DEV_AUTOTEST_ACTION_LOG_PREFERENCES, 0, 0, 0, 1, "dg00_scale" },
+    DISPLAY_BACK_CYCLE(01)
+    DISPLAY_BACK_CYCLE(02)
+    DISPLAY_BACK_CYCLE(03)
+    DISPLAY_BACK_CYCLE(04)
+    DISPLAY_BACK_CYCLE(05)
+    DISPLAY_BACK_CYCLE(06)
+    DISPLAY_BACK_CYCLE(07)
+    DISPLAY_BACK_CYCLE(08)
+    DISPLAY_BACK_CYCLE(09)
+    DISPLAY_BACK_CYCLE(10)
+};
+#undef DISPLAY_BACK_CYCLE
+
 // Title screen of the mobile UI: settings and back, the character selector
 // (tabs, a swipe, the own character's card, back), Continue loads the save
 // made last.
@@ -2995,6 +3019,9 @@ void devAutotestSetScenario(const char* name)
     } else if (strcmp(name, "elevator") == 0) {
         gDevAutotestSteps = kDevAutotestElevatorSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestElevatorSteps) / sizeof(kDevAutotestElevatorSteps[0]);
+    } else if (strcmp(name, "displaygeometry") == 0) {
+        gDevAutotestSteps = kDevAutotestDisplayGeometrySteps;
+        gDevAutotestStepCount = sizeof(kDevAutotestDisplayGeometrySteps) / sizeof(kDevAutotestDisplayGeometrySteps[0]);
     } else if (strcmp(name, "mainmenu") == 0) {
         gDevAutotestSteps = kDevAutotestMainMenuSteps;
         gDevAutotestStepCount = sizeof(kDevAutotestMainMenuSteps) / sizeof(kDevAutotestMainMenuSteps[0]);
@@ -6176,7 +6203,11 @@ void devAutotestTick()
                 && muiGetWidgetCenter(step->widget, &x, &y) && muiGetWidgetCenter(step->target, &targetX, &targetY)) {
                 float width = static_cast<float>(screenGetWidth());
                 float height = static_cast<float>(screenGetHeight());
-                devAutotestLog("  mui drag %s -> %s\n", step->widget, step->target);
+                // a/b offset the release point in normalized screen units.
+                // Exercise near-edge drops as well as exact widget centers.
+                targetX += step->a;
+                targetY += step->b;
+                devAutotestLog("  mui drag %s -> %s at (%.4f, %.4f)\n", step->widget, step->target, targetX, targetY);
                 // `c` - capture at this frame of the drag too ("<name>_drag").
                 static std::string captureName;
                 captureName = std::string(step->name) + "_drag";

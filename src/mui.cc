@@ -18,6 +18,10 @@
 #include "kb.h"
 #include "message.h"
 #include "platform_compat.h"
+#ifdef __IPHONEOS__
+#include "platform/ios/display_metrics.h"
+#endif
+
 #include "settings.h"
 #include "svga.h"
 #include "touch.h"
@@ -128,6 +132,9 @@ namespace {
     std::string gActiveId;
     bool gActiveLongPressed = false;
 
+    enum class SliderGesture { Pending, Horizontal, Vertical };
+    SliderGesture gSliderGesture = SliderGesture::Pending;
+
     struct DragState {
         bool active = false;
         std::string source;
@@ -222,6 +229,7 @@ namespace {
                 // When the finger went down (queued ones: before now).
                 gPointer.downTime = event.time;
                 gPointer.moved = false;
+                gSliderGesture = SliderGesture::Pending;
                 break;
             }
 
@@ -240,6 +248,18 @@ namespace {
 
     void updateSafeRect(unsigned int now)
     {
+#ifdef __IPHONEOS__
+        // Menus draw directly in output pixels: use measured output insets,
+        // without a lossy logical round trip or the one-second Android cache.
+        // This also preserves letterbox clearance without adding it twice.
+        auto geometry = iosDisplayMetricsGet();
+        gSafeRect = { 0, 0, static_cast<float>(gOutputWidth), static_cast<float>(gOutputHeight) };
+        if (geometry.valid) {
+            gSafeRect = { geometry.outputInsets[0], geometry.outputInsets[1],
+                std::max(0.0f, gOutputWidth - geometry.outputInsets[0] - geometry.outputInsets[2]),
+                std::max(0.0f, gOutputHeight - geometry.outputInsets[1] - geometry.outputInsets[3]) };
+        }
+#else
         if (gSafeRectValid && now - gSafeRectTime < 1000) {
             return;
         }
@@ -255,6 +275,7 @@ namespace {
         };
         gSafeRectTime = now;
         gSafeRectValid = true;
+#endif
     }
 
     MuiScreen* topScreen()
@@ -446,6 +467,7 @@ bool MuiContext::touchable(const std::string& id, const MuiRect& rect, bool* pre
         && !(current != nullptr && static_cast<int>(gPointer.downTime - current->openTime) < 0)) {
         gActiveId = id;
         gActiveLongPressed = false;
+        gSliderGesture = SliderGesture::Pending;
     }
 
     if (gActiveId != id) {
@@ -534,6 +556,7 @@ float MuiContext::scrollAlong(const std::string& id, const MuiRect& rect, float 
         bool ownedByChild = gActiveId.empty() || gActiveId.rfind(id + ".", 0) == 0;
         // Content that fits doesn't scroll, the finger stays with the child.
         if (gPointer.down && startedInside && !state.dragging && ownedByChild && maxOffset > 0.0f
+            && gSliderGesture != SliderGesture::Horizontal
             && std::fabs(dy) > slop && std::fabs(dy) > std::fabs(dx)) {
             state.dragging = true;
             gActiveId = id;
@@ -799,16 +822,28 @@ float MuiContext::slider(const std::string& id, const MuiRect& rect, float value
     // Taller touch area than the track.
     MuiRect touchRect = rect.inset(0.0f, -dp(10.0f));
     bool pressed;
-    touchable(id, touchRect, &pressed);
+    bool tapped = touchable(id, touchRect, &pressed);
 
-    bool held = isInteractive && gActiveId == id && gPointer.down && maxValue > minValue;
-    if (held) {
+    bool ownsTouch = isInteractive && gActiveId == id && maxValue > minValue;
+    float dx = std::fabs(gPointer.x - gPointer.startX);
+    float dy = std::fabs(gPointer.y - gPointer.startY);
+    float slop = dp(kTheme.touchSlop);
+    if (ownsTouch && gSliderGesture == SliderGesture::Pending && std::max(dx, dy) > slop) {
+        // Decide once, using the same scaled slop and direction as scrolling.
+        // A horizontal adjustment keeps ownership even if the finger later
+        // wanders vertically; a vertical gesture never changes the value.
+        gSliderGesture = dx > dy ? SliderGesture::Horizontal : SliderGesture::Vertical;
+    }
+    tapped = ownsTouch && tapped && !gPointer.moved && std::max(dx, dy) <= slop
+        && gSliderGesture == SliderGesture::Pending;
+    bool held = ownsTouch && gPointer.down && gSliderGesture == SliderGesture::Horizontal;
+    if (ownsTouch && (held || tapped || (gPointer.released && gSliderGesture == SliderGesture::Horizontal))) {
         float ratio = std::clamp((gPointer.x - rect.x) / std::max(rect.w, 1.0f), 0.0f, 1.0f);
         value = minValue + ratio * (maxValue - minValue);
     }
 
     if (dragging != nullptr) {
-        *dragging = held;
+        *dragging = held || tapped;
     }
 
     float ratio = maxValue > minValue ? std::clamp((value - minValue) / (maxValue - minValue), 0.0f, 1.0f) : 0.0f;
@@ -864,7 +899,14 @@ bool MuiContext::segmented(const std::string& id, const MuiRect& rect, const std
     }
     float room = rect.w - padding * labels.size();
     if (textWidth > room && textWidth > 0.0f) {
+#ifdef __IPHONEOS__
+        // Correct point density plus a large user scale can exhaust the row.
+        // Honoring the old minimum then makes the last hitbox negative and
+        // overlaps labels. Fit the shared control instead of resizing a screen.
+        size = std::max(size * room / textWidth, 1.0f);
+#else
         size = std::max(size * room / textWidth, dp(10.0f));
+#endif
         textWidth = 0.0f;
         for (const std::u32string& label : labels) {
             textWidth += muiTextWidth(label, size);
@@ -919,6 +961,7 @@ bool MuiContext::tappedOutside(const MuiRect& rect)
 void muiPush(MuiScreen* screen)
 {
     muiRemove(screen);
+    muiInvalidateImageTextures();
     screen->finished = false;
     screen->openTime = SDL_GetTicks();
     // A screen run before by `muiRunModal` and pushed again.
@@ -1286,6 +1329,10 @@ bool muiGetWidgetCenter(const char* id, float* x, float* y)
         return false;
     }
 
+    devAutotestNote("  widget bounds %s: output=%dx%d dp=%.3f rect=(%.1f,%.1f,%.1f,%.1f) safe=(%.1f,%.1f,%.1f,%.1f)\n",
+        id, gOutputWidth, gOutputHeight, gPixelsPerDp,
+        it->second.x, it->second.y, it->second.w, it->second.h,
+        gSafeRect.x, gSafeRect.y, gSafeRect.w, gSafeRect.h);
     *x = it->second.centerX() / gOutputWidth;
     *y = it->second.centerY() / gOutputHeight;
     return true;

@@ -47,6 +47,9 @@ void touchHudClearMessages();
 // loop, `false` - not one of them.
 bool touchHudHandleEvent(int eventCode);
 
+// Shared touch quick-load confirmation; does not dispatch or load.
+bool touchHudConfirmQuickLoad();
+
 // Indicators (SNEAK, LEVEL, ...) are shown by HUD instead of the bar.
 void touchHudSetIndicators(const InterfaceIndicator* indicators, int count);
 

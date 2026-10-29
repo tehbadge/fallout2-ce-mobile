@@ -1,6 +1,6 @@
 #include "quick_toolbar.h"
 
-#if defined(__APPLE__) && TARGET_OS_IOS
+#if defined(__APPLE__) && TARGET_OS_IOS && !FALLOUT_TOUCH_ONLY
 
 #include <string.h>
 
@@ -223,4 +223,4 @@ bool quickToolbarHandleTap(int x, int y)
 
 } // namespace fallout
 
-#endif // defined(__APPLE__) && TARGET_OS_IOS
+#endif // Legacy iOS controls only.

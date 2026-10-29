@@ -1528,7 +1528,7 @@ void gameMouseSetMode(GameMouseMode mode)
     // On iPad, keep the gameplay cursor in trackpad mode so tapping the
     // screen doesn't teleport the cursor mid-combat. UI screens (inventory,
     // skilldex, elevator, menus) still enable touchscreen mode explicitly.
-#if __APPLE__ && TARGET_OS_IOS
+#if __APPLE__ && TARGET_OS_IOS && !FALLOUT_TOUCH_ONLY
     touch_set_touchscreen_mode(false);
 #else
     // CE: With touch controls fingers always point at things directly.

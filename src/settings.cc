@@ -406,6 +406,9 @@ void initSettingsRegistry(bool isMapper)
     SETTING(controls);
     SETTING(hud);
     SETTING(mobile_ui);
+#ifdef __IPHONEOS__
+    SETTING(game_menu_quick_actions);
+#endif
     SETTING_P(hud_scale, clamp(50, 200));
     SETTING_P(hud_density, clamp(0.0, 8.0));
     SETTING(tactical_view);

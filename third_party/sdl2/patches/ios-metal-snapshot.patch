@@ -1,0 +1,94 @@
+--- a/src/render/metal/SDL_render_metal.m
++++ b/src/render/metal/SDL_render_metal.m
+@@ -454,6 +454,11 @@
+         }
+ 
+         data.mtlpassdesc.colorAttachments[0].loadAction = load;
++#if defined(__IPHONEOS__)
++        /* Snapshot/SDL continuation passes must preserve tile attachment data.
++         * Specify this before encoder creation; known store actions are immutable. */
++        data.mtlpassdesc.colorAttachments[0].storeAction = MTLStoreActionStore;
++#endif
+         data.mtlpassdesc.colorAttachments[0].texture = mtltexture;
+ 
+         data.mtlcmdbuffer = [data.mtlcmdqueue commandBuffer];
+@@ -1531,6 +1536,79 @@
+     data = (__bridge METAL_RenderData *) renderer->driverdata;
+     return (__bridge void*)data.mtlcmdencoder;
+ }}
++
++/* Project-private iOS experiment; not an SDL public API. The caller supplies
++ * a live, application-owned MTLTexture. SDL retains all command/drawable ownership. */
++#if defined(__IPHONEOS__)
++int F2CE_SDLMetalCopyWindowToTexture(SDL_Renderer *renderer, void *destinationMetalTexture);
++int F2CE_SDLMetalCopyWindowToTexture(SDL_Renderer *renderer, void *destinationMetalTexture)
++{ @autoreleasepool {
++    SDL_RendererInfo info;
++    METAL_RenderData *data;
++    id<MTLTexture> destination = (__bridge id<MTLTexture>)destinationMetalTexture;
++    id<MTLTexture> source;
++    id<MTLBlitCommandEncoder> blit;
++    SDL_bool ready;
++    /* Public entry points validate the renderer magic before private access. */
++    if (SDL_GetRendererInfo(renderer, &info) < 0) {
++        return -1;
++    }
++    if (renderer->GetMetalCommandEncoder != METAL_GetMetalCommandEncoder || renderer->target) {
++        return SDL_SetError("F2CE snapshot requires a Metal window target");
++    }
++    if (!destination || ![destination conformsToProtocol:@protocol(MTLTexture)]) {
++        return SDL_SetError("F2CE snapshot requires a live Metal texture");
++    }
++    if (SDL_RenderFlush(renderer) < 0) {
++        return -1;
++    }
++    data = (__bridge METAL_RenderData *)renderer->driverdata;
++    source = data.mtlbackbuffer.texture;
++    /* Never acquire a new, undefined drawable just to take a snapshot. */
++    if (!source || renderer->hidden) {
++        return SDL_SetError("F2CE snapshot has no composed window drawable");
++    }
++    if (source == destination || source.framebufferOnly ||
++        source.device != destination.device || destination.device != data.mtldevice ||
++        source.pixelFormat != destination.pixelFormat ||
++        source.width != destination.width || source.height != destination.height ||
++        source.textureType != MTLTextureType2D || destination.textureType != MTLTextureType2D ||
++        source.sampleCount != 1 || destination.sampleCount != 1 ||
++        destination.mipmapLevelCount != 1 || destination.arrayLength != 1 ||
++        destination.storageMode == MTLStorageModeMemoryless ||
++        !(destination.usage & MTLTextureUsageShaderRead) ||
++        destination.hazardTrackingMode == MTLHazardTrackingModeUntracked) {
++        return SDL_SetError("F2CE snapshot texture/device/format/size/usage mismatch");
++    }
++    if (!METAL_ActivateRenderCommandEncoder(renderer, MTLLoadActionLoad, NULL, nil)) {
++        return SDL_SetError("F2CE snapshot cannot activate window encoder");
++    }
++    /* Tile contents must reach texture storage before the blit. */
++    [data.mtlcmdencoder endEncoding];
++    data.mtlcmdencoder = nil;
++    blit = [data.mtlcmdbuffer blitCommandEncoder];
++    if (blit) {
++        blit.label = @"F2CE window GPU snapshot";
++        [blit copyFromTexture:source sourceSlice:0 sourceLevel:0
++            sourceOrigin:MTLOriginMake(0, 0, 0)
++            sourceSize:MTLSizeMake(source.width, source.height, 1)
++            toTexture:destination destinationSlice:0 destinationLevel:0
++            destinationOrigin:MTLOriginMake(0, 0, 0)];
++        [blit endEncoding];
++    }
++    /* Activate creates a new buffer. Commit the existing enqueued buffer first,
++     * just as SDL's RunCommandQueue does. No CPU wait or foreign queue. */
++    [data.mtlcmdbuffer commit];
++    data.mtlcmdbuffer = nil;
++    ready = METAL_ActivateRenderCommandEncoder(renderer, MTLLoadActionLoad, NULL, nil);
++    if (!blit || !ready || !data.mtlcmdencoder) {
++        return SDL_SetError("F2CE snapshot could not create blit/resume encoder");
++    }
++    /* Next SDL batch rebuilds its local state cache. Present still owns the
++     * same drawable. Default retained command buffers protect in-flight textures. */
++    return 0;
++}}
++#endif
+ 
+ static int METAL_SetVSync(SDL_Renderer * renderer, const int vsync)
+ {

@@ -3,9 +3,9 @@
 
 #include <SDL.h>
 
-// CE: Touch-only build (Android; `FALLOUT_FORCE_TOUCH_ONLY` makes a desktop
-// one for automated tests): fingers are the only pointer. The mobile UI,
-// touch HUD, touch controls and the world view are always on (settings.cc;
+// CE: Touch-only build (Android; iOS sets `FALLOUT_FORCE_TOUCH_ONLY`, also
+// used on desktop for automated tests): fingers are the only pointer. The
+// mobile UI, touch HUD, touch controls and the world view are always on (settings.cc;
 // `muiIsEnabled` and `touchHudIsEnabled` are constants), the game's windows
 // the mobile UI replaced aren't built, there's no mouse at all:
 // nothing is emulated from touches (the emulation isn't built either), a

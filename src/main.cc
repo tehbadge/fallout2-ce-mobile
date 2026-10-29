@@ -1,4 +1,5 @@
 #include "main.h"
+#include "death_subtitle.h"
 
 #include <algorithm>
 #include <limits.h>
@@ -68,7 +69,7 @@ static void showDeath();
 static int mainCurtainShow();
 static void mainCurtainHide(int win);
 static void _main_death_voiceover_callback();
-static int _mainDeathGrabTextFile(const char* fileName, char* dest);
+static int _mainDeathGrabTextFile(const char* fileName, char* dest, size_t capacity);
 static void _mainDeathRemoveTimings(char* text);
 static int _mainDeathWordWrap(char* text, int width, short* beginnings, short* count);
 
@@ -609,7 +610,7 @@ static void showDeath()
                 muiSceneShow();
                 muiSceneSetPicture(InterfaceFrameId::DeathScene);
                 char text[512];
-                if (settings.preferences.subtitles && _mainDeathGrabTextFile(deathFileName, text) == 0) {
+                if (settings.preferences.subtitles && _mainDeathGrabTextFile(deathFileName, text, sizeof(text)) == 0) {
                     _mainDeathRemoveTimings(text);
                     const char* start = text;
                     while (*start == ' ') {
@@ -625,7 +626,7 @@ static void showDeath()
 
                 if (settings.preferences.subtitles) {
                     char text[512];
-                    if (_mainDeathGrabTextFile(deathFileName, text) == 0) {
+                    if (_mainDeathGrabTextFile(deathFileName, text, sizeof(text)) == 0) {
                         debugPrint("\n((ShowDeath)): %s\n", text);
 
                         short beginnings[WORD_WRAP_MAX_COUNT];
@@ -730,7 +731,7 @@ static void _main_death_voiceover_callback()
 // Read endgame subtitle.
 //
 // 0x4814B4
-static int _mainDeathGrabTextFile(const char* fileName, char* dest)
+static int _mainDeathGrabTextFile(const char* fileName, char* dest, size_t capacity)
 {
     const char* p = strrchr(fileName, '\\');
     if (p == nullptr) {
@@ -740,29 +741,7 @@ static int _mainDeathGrabTextFile(const char* fileName, char* dest)
     char path[COMPAT_MAX_PATH];
     snprintf(path, sizeof(path), "text\\%s\\cuts\\%s%s", settings.system.language.c_str(), p + 1, ".TXT");
 
-    File* stream = fileOpen(path, "rt");
-    if (stream == nullptr) {
-        return -1;
-    }
-
-    while (true) {
-        int c = fileReadChar(stream);
-        if (c == -1) {
-            break;
-        }
-
-        if (c == '\n') {
-            c = ' ';
-        }
-
-        *dest++ = (c & 0xFF);
-    }
-
-    fileClose(stream);
-
-    *dest = '\0';
-
-    return 0;
+    return deathSubtitleRead(path, dest, capacity);
 }
 
 // 0x481598

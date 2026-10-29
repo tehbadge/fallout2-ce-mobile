@@ -348,6 +348,9 @@ struct TouchSettings {
     bool hud = false;
     bool mobile_ui = false;
 #endif
+#ifdef __IPHONEOS__
+    bool game_menu_quick_actions = false;
+#endif
     // HUD and mobile UI size in percent: buttons, text and the game screens'
     // windows are sized in dp times it (a smaller size works as a screen of
     // more dp, `hudIsTabletScreen`).

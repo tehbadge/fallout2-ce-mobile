@@ -222,8 +222,9 @@ public:
     // `beginTextInput`), taken by the screen reading it.
     std::u32string takeTextInput();
 
-    // Horizontal slider over [rect], returns the value (finger sets it).
-    // [dragging] - the finger holds it now.
+    // Horizontal slider over [rect]. Updates on tap release or after a
+    // horizontal drag crosses touch slop; vertical gestures stay with scroll.
+    // [dragging] - an active adjustment, including the tap-release frame.
     float slider(const std::string& id, const MuiRect& rect, float value, float minValue, float maxValue, bool* dragging = nullptr);
 
     // On / off switch over [rect]: a tap flips [value]. Returns true when it

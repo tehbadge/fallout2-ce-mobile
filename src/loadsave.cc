@@ -1,4 +1,5 @@
 #include "loadsave.h"
+#include "save_preview_png.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -3011,11 +3012,7 @@ bool lsgMobileReadWidePreview(int slot, std::vector<unsigned char>* rgba, int* w
     unsigned decodedWidth = 0;
     unsigned decodedHeight = 0;
     std::vector<unsigned char> decoded;
-    if (lodepng::decode(decoded, decodedWidth, decodedHeight, encoded) != 0
-        || decodedWidth == 0
-        || decodedHeight == 0
-        || decodedWidth > kMobileWidePreviewMaxSize * 2
-        || decodedHeight > kMobileWidePreviewMaxSize * 2) {
+    if (!savePreviewPngDecode(encoded, decoded, decodedWidth, decodedHeight)) {
         return false;
     }
 

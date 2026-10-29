@@ -1,4 +1,5 @@
 #include "mui_draw.h"
+#include "mui_font_data.h"
 
 #include <algorithm>
 #include <cmath>
@@ -117,6 +118,7 @@ namespace {
     struct IndexedTexture {
         ArtTexture base;
         unsigned int version = 0;
+        bool valid = false;
     };
     std::map<std::string, IndexedTexture> gIndexedTextures;
     unsigned char gPalette[768];
@@ -156,20 +158,20 @@ namespace {
         }
 
         const char* path = kFontPaths[index];
-        File* stream = fileOpen(path, "rb");
-        if (stream == nullptr) {
-            debugPrint("MUI: can't open font %s\n", path);
+        if (!muiReadTrustedFont(index, font.data)) {
+            debugPrint("MUI: can't read trusted font %s\n", path);
+            font.info = {};
             font.failed = true;
             return nullptr;
         }
 
-        int size = fileGetSize(stream);
-        font.data.resize(size);
-        size_t read = fileRead(font.data.data(), 1, size, stream);
-        fileClose(stream);
-
-        if (static_cast<int>(read) != size || !stbtt_InitFont(&font.info, font.data.data(), stbtt_GetFontOffsetForIndex(font.data.data(), 0))) {
-            debugPrint("MUI: can't read font %s\n", path);
+        // Exact asset identity is established before any stb parsing (including offsets).
+        int offset = stbtt_GetFontOffsetForIndex(font.data.data(), 0);
+        if (offset < 0 || static_cast<size_t>(offset) >= font.data.size()
+            || !stbtt_InitFont(&font.info, font.data.data(), offset)) {
+            debugPrint("MUI: can't initialize font %s\n", path);
+            font.info = {};
+            font.data.clear();
             font.failed = true;
             return nullptr;
         }
@@ -452,6 +454,15 @@ SDL_BlendMode muiPremultipliedBlendMode()
 {
     return SDL_ComposeCustomBlendMode(SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD,
         SDL_BLENDFACTOR_ONE, SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, SDL_BLENDOPERATION_ADD);
+}
+
+void muiInvalidateImageTextures()
+{
+    // Screen-local versions can start over when a screen is reopened. Keep
+    // the allocations, but require fresh pixels before accepting a cache hit.
+    for (auto& entry : gIndexedTextures) {
+        entry.second.valid = false;
+    }
 }
 
 void muiDrawReset()
@@ -962,13 +973,23 @@ static bool uploadIndexed(ArtTexture& entry, const unsigned char* data, int widt
     if (entry.texture == nullptr) {
         entry.texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
         if (entry.texture == nullptr) {
+            entry.width = 0;
+            entry.height = 0;
             return false;
         }
         SDL_SetTextureBlendMode(entry.texture, SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(entry.texture, SDL_ScaleModeNearest);
     }
 
-    SDL_UpdateTexture(entry.texture, nullptr, pixels.data(), width * 4);
+    if (SDL_UpdateTexture(entry.texture, nullptr, pixels.data(), width * 4) != 0) {
+        // A resized allocation may no longer match the last uploaded size.
+        // Discard failed pixels so a retry cannot reuse it with old metadata.
+        SDL_DestroyTexture(entry.texture);
+        entry.texture = nullptr;
+        entry.width = 0;
+        entry.height = 0;
+        return false;
+    }
     entry.width = width;
     entry.height = height;
     entry.paletteVersion = gPaletteVersion;
@@ -984,15 +1005,17 @@ SDL_Texture* muiIndexedTexture(const std::string& key, const unsigned char* data
     checkPalette();
 
     IndexedTexture& entry = gIndexedTextures[key];
-    if (entry.base.texture != nullptr && entry.version == version && entry.base.paletteVersion == gPaletteVersion
+    if (entry.valid && entry.base.texture != nullptr && entry.version == version && entry.base.paletteVersion == gPaletteVersion
         && entry.base.width == width && entry.base.height == height) {
         return entry.base.texture;
     }
 
+    entry.valid = false;
     if (!uploadIndexed(entry.base, data, width, height)) {
         return nullptr;
     }
     entry.version = version;
+    entry.valid = true;
     return entry.base.texture;
 }
 
@@ -1003,10 +1026,11 @@ SDL_Texture* muiRgbaTexture(const std::string& key, const unsigned char* data, i
     }
 
     IndexedTexture& entry = gIndexedTextures["rgba." + key];
-    if (entry.base.texture != nullptr && entry.version == version && entry.base.width == width && entry.base.height == height) {
+    if (entry.valid && entry.base.texture != nullptr && entry.version == version && entry.base.width == width && entry.base.height == height) {
         return entry.base.texture;
     }
 
+    entry.valid = false;
     if (entry.base.texture != nullptr && (entry.base.width != width || entry.base.height != height)) {
         SDL_DestroyTexture(entry.base.texture);
         entry.base.texture = nullptr;
@@ -1015,16 +1039,25 @@ SDL_Texture* muiRgbaTexture(const std::string& key, const unsigned char* data, i
     if (entry.base.texture == nullptr) {
         entry.base.texture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
         if (entry.base.texture == nullptr) {
+            entry.base.width = 0;
+            entry.base.height = 0;
             return nullptr;
         }
         SDL_SetTextureBlendMode(entry.base.texture, SDL_BLENDMODE_BLEND);
         SDL_SetTextureScaleMode(entry.base.texture, SDL_ScaleModeNearest);
     }
 
-    SDL_UpdateTexture(entry.base.texture, nullptr, data, width * 4);
+    if (SDL_UpdateTexture(entry.base.texture, nullptr, data, width * 4) != 0) {
+        SDL_DestroyTexture(entry.base.texture);
+        entry.base.texture = nullptr;
+        entry.base.width = 0;
+        entry.base.height = 0;
+        return nullptr;
+    }
     entry.base.width = width;
     entry.base.height = height;
     entry.version = version;
+    entry.valid = true;
     return entry.base.texture;
 }
 

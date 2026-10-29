@@ -1,10 +1,14 @@
 # Fallout 2 CE Mobile (unofficial)
 
-[Русская версия](README.ru.md)
+**⚠️ Important: There is no ready-to-install iOS version of Fallout 2 available for download from this project.**
 
-A fork of [Fallout 2: Community Engine](https://github.com/fallout2-ce/fallout2-ce) made for Android phones: every screen of the game rebuilt for a touch screen, in landscape. **Early beta.**
+This repository contains the source code for an iOS port. Running it requires building and signing the application yourself using Xcode. A legally acquired copy of Fallout 2 is also required to supply the original game files. The project does not distribute the original game.
 
-This is an **unofficial, fan-made, modified version** of Fallout 2 CE. It is not affiliated with or endorsed by Bethesda Softworks, ZeniMax Media or Interplay. Fallout is a trademark of its owners. The app contains **no game data**: you need your own copy of Fallout 2 ([GOG](https://www.gog.com/game/fallout_2), [Steam](https://store.steampowered.com/app/38410), [Epic Games](https://store.epicgames.com/p/fallout-2)).
+Unsigned iOS build artifacts may be available through development workflows, but these are not ready-to-install releases.
+
+An unofficial downstream development of [imbaner/fallout2-ce-mobile](https://github.com/imbaner/fallout2-ce-mobile), itself a fork of [Fallout 2: Community Engine](https://github.com/fallout2-ce/fallout2-ce). imbaner created the Android mobile port and redesigned touch interface. This downstream adds native iOS support and additional fixes while retaining the shared C++/SDL2 engine and mobile UI. **Early beta; public-fork and iOS release preparation are in progress.**
+
+This is an **unofficial, fan-made, modified version** of Fallout 2 CE. It is not affiliated with or endorsed by Bethesda Softworks, ZeniMax Media or Interplay. Fallout is a trademark of its owners. Original Fallout 2 installation archives, music and videos are not supplied. The project includes additional interface resources, fonts and scripts; see [License and attribution](#license-and-attribution). You need a legally acquired copy of Fallout 2 ([GOG](https://www.gog.com/game/fallout_2), [Steam](https://store.steampowered.com/app/38410), [Epic Games](https://store.epicgames.com/p/fallout-2)).
 
 ## Screenshots
 
@@ -14,7 +18,7 @@ This is an **unofficial, fan-made, modified version** of Fallout 2 CE. It is not
 
 ## What is changed (modified software notice)
 
-On top of CE (its engine, fixes and sfall compatibility are kept and updated from upstream):
+The inherited mobile port provides the following features on top of CE; its engine, fixes and sfall compatibility are retained. The iOS adaptation reuses this work:
 
 - **Touch UI.** The game's screens are replaced with screens made for fingers and the phone's resolution: dialogue, barter, inventory, loot, character and level-up, character creation, Pip-Boy (quests, holodisks with their voice, maps, videos, rest), automap, world map and town maps, skills, game menu, settings, save/load, main menu, dialog boxes, called shots. No cursor: tap to act, long press for the action menu, drag to move items, two fingers to zoom the map.
 - **HUD.** Buttons anchored to the screen's edges (sized in dp), the attack modes with reload, the message log, end turn/combat.
@@ -23,28 +27,48 @@ On top of CE (its engine, fixes and sfall compatibility are kept and updated fro
 - **Saves.** A save list sorted by when saves were made, quick saves that never overwrite manual ones (their number is a setting), "Continue" in the main menu, saves interrupted midway are restored, optional marks for saves made with other game files or mods.
 - **Android app.** The game's files are imported from a folder or any archive (.zip, .7z, .rar, .tar...) copied from a computer, with RPU and other mods and the saves; "Replace game" for new builds and mod updates; export and import of saves.
 - **The port's own improvements** are settings (`[enhancements]` in `fallout2.cfg`).
+- **iPhone and iPad.** Shared touch controls, display density and safe-area handling, both landscape orientations, and phone/tablet layouts. Settings → Display offers **Game screens** and **Screen layouts**, including Auto choices for windows and roomier layouts where they fit.
+- **iOS quick actions.** **Quick Save/Load in Game Menu** moves the HUD quick actions into the Game Menu when enabled; it defaults to Off and is saved with settings. The separate **Quick saves** setting controls automatic quicksave slots; Off uses the save picker.
+- **iOS CRT display.** Settings → Display → **CRT** offers **Off**, **Tonytron**, **Arcade** and **Consumer TV**. Selection changes immediately, survives same-session navigation/background-resume, and is independent of Apply/Reset. It is not saved: each new process starts Off.
 
-The full list of changes is the git history over upstream.
+The public history preserves upstream commits and consolidates the accepted downstream implementation into one commit; historical private checkpoints and validation are described in [iOS status](docs/ios-port/STATUS.md). iPhone 17 Pro Max and iPad Air 3 have historical physical gameplay acceptance, including save/load, with scope recorded in [iOS status](docs/ios-port/STATUS.md). All 15 hosted host regressions and unsigned iOS arm64 build/package jobs passed at the accepted baseline. The final integrated texture-cache correction still needs physical acceptance before an accepted binary release; this is not testing of every compatible device or OS version.
 
 ## Install on Android
 
-1. Download the APK from [Releases](https://github.com/imbaner/fallout2-ce-mobile/releases) and install it.
+1. Download the original mobile maintainer's APK from [imbaner’s releases](https://github.com/imbaner/fallout2-ce-mobile/releases) and install it. These are upstream Android releases, not downstream iOS builds.
 2. Copy your Fallout 2 folder from a computer to the phone: as is, or as one archive (cable, cloud drive, messenger). Mods installed there (for example [RPU](https://github.com/BGforgeNet/Fallout2_Restoration_Project)) and saves come along.
 3. Start the app and choose that folder or archive.
 
-Tested on a Redmi 15C (Android 16); players also run it on tablets (Alldocube). Android 7.0 or newer, arm64.
+Upstream reports testing on a Redmi 15C (Android 16) and player use on Alldocube tablets. Android 7.0 or newer, arm64. These reports are inherited; this downstream does not claim new Android physical acceptance.
 
-Plain Fallout 2 from GOG, Steam or Epic works too, with or without mods. The game's language is taken from its own files, older translations included; if your copy doesn't work, please open an [issue](https://github.com/imbaner/fallout2-ce-mobile/issues).
+Plain Fallout 2 from GOG, Steam or Epic works too, with or without mods. The game's language is taken from its own files, older translations included. Problems with the original Android release belong in [upstream’s issue tracker](https://github.com/imbaner/fallout2-ce-mobile/issues).
 
-**Recommended setup: Fallout 2 + [Restoration Project (RPU)](https://github.com/BGforgeNet/Fallout2_Restoration_Project) 2.4.34.** The port is played and tested with it. RPU relies on sfall, which this engine reimplements: Fallout 2: Community Engine, the continuation of the original Fallout 2 Community Edition. Install RPU into the game folder on a computer, then copy the folder to the phone.
+**Recommended setup: Fallout 2 + [Restoration Project (RPU)](https://github.com/BGforgeNet/Fallout2_Restoration_Project) 2.4.34.** This is the upstream mobile port’s recommended/tested setup; it is not a claim of downstream iOS acceptance for every mod configuration. RPU relies on sfall, which this engine reimplements: Fallout 2: Community Engine, the continuation of the original Fallout 2 Community Edition. Install RPU into the game folder on a computer, then copy the folder to the phone.
+
+## Install on iOS / iPadOS
+
+Requires an arm64 iPhone or iPad with **iOS/iPadOS 15.0 or later**. That is the build minimum, not a physical-test matrix. Both landscape orientations are supported.
+
+There is no ready-to-install iOS release from this project. Development CI can produce an **unsigned IPA**, accompanied by matching `ce.dat` and an example configuration; the historical private runs are not public downloads. It cannot be directly installed as an ordinary signed app. Build and sign with your own Apple development credentials; see [iOS build and resources](CONTRIBUTING.md#ios--ipados). Development-signed Xcode installations were historically tested; AltStore, Sideloadly, TestFlight and App Store distribution have not been validated for this downstream.
+
+After installing a signed build, launch it once to create its Documents directory. Launch alone cannot establish gameplay readiness without game files. Use Finder’s device **Files** tab to copy `master.dat`, `critter.dat`, `patch000.dat` where supplied by your installation, matching `ce.dat`, and the relevant `data` and `sound` folders into the app’s document root, without an extra enclosing Fallout2 folder. The app enables File Sharing and reads game files from Documents. Keep resource paths consistent with your configuration. A complete folder transfer through every Finder/Windows client is not independently validated here; Android’s folder/archive importer is not implemented on iOS.
+
+Use `ce.dat` from the same source revision/build package as the engine. Preserve existing `fallout2.cfg` and `SAVEGAME`; the example configuration is a reference, not an instruction to overwrite them. Back up Documents before updating. Keep the installed bundle identity and compatible signing identity when updating in place: changing identity may create another app/container, and uninstalling may delete saves. Provisioning/trust and renewal requirements depend on your Apple account. The CI bundle identity is not a promise of compatibility with an existing development installation.
+
+Touch controls are shared with the Android mobile interface: tap destinations/actions, long press for context actions, drag items, and use two fingers to pan/pinch the map. HUD and screen buttons provide navigation; the legacy CE cursor/trackpad gesture lists do not describe this touch-only build.
 
 ## Known limitations
 
-- Landscape only; portrait is planned.
-- Android only: no iOS or browser version yet.
-- Laid out for phones: on tablets, 4:3 screens especially, the same layout is scaled up.
-- Made for phones and tested on Android; the desktop builds keep CE's original windows (`[touch] mobile_ui=0`) and are not the focus of this fork.
-- Mods with their own script windows are not covered by the touch UI (none of the popular ones use them).
+- Landscape only; no portrait acceptance or downstream browser validation.
+- Final integrated texture-cache correction awaits physical acceptance; see [current status](docs/ios-port/STATUS.md#current-accepted-state-2026-10-28).
+- Higher-scale iPad usability and broad device/OS compatibility are not exhaustively established. Desktop builds retain CE’s original windows (`[touch] mobile_ui=0`).
+- CRT is optional and increases GPU cost. Historical iPad Air 3 profiling measured roughly 47–52 FPS with CRT versus 59 FPS Off in one scene; battery impact remains unmeasured.
+- Partial save relocation (F8) and allocation failure during renderer recreation (F9) remain assessed, deferred edge cases. This does not negate ordinary save/load acceptance.
+- Mods with custom script windows are not covered by the shared touch UI.
+
+## Reporting problems
+
+For this downstream’s iOS behavior, use this repository’s Issues tab when enabled, or the contact supplied with your build until its public tracker is configured. Include engine commit/build, device and OS, reproduction steps, relevant settings and logs with personal data removed. Provide saves only when needed and share them deliberately; do not upload purchased game archives. Upstream Android release issues should use the upstream tracker linked above.
 
 ## Building
 
@@ -55,17 +79,23 @@ cd os/android
 ./gradlew assembleRelease -PabiFilters=arm64-v8a
 ```
 
-A release build is signed with your own key: point the Gradle property `fallout2ce.releaseKeystoreProperties` to a properties file with `storeFile`, `storePassword`, `keyAlias`, `keyPassword` (never commit it). Desktop builds are as upstream's (CMake).
+A release build is signed with your own key: point the Gradle property `fallout2ce.releaseKeystoreProperties` to a properties file with `storeFile`, `storePassword`, `keyAlias`, `keyPassword` (never commit it). Desktop builds are as upstream's (CMake). For iOS signing, matching resources and host regression commands, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## License and attribution
 
-The engine is under the [Sustainable Use License](LICENSE.md), as upstream: free, non-commercial distribution only, with the license and notices kept. Third-party components: SDL 2, zlib, LodePNG (zlib license), libarchive (BSD), liblzma from XZ Utils (0BSD), stb (MIT / public domain), fpattern, Fallout Classic Dialog font (MIT), PT Mono font (SIL OFL 1.1). The app shows all of them in Settings → About.
+The engine is under the [Sustainable Use License](LICENSE.md), as upstream: free, non-commercial distribution only, with the license and notices kept. Third-party components: SDL 2, zlib, LodePNG (zlib license), libarchive (BSD), liblzma from XZ Utils (0BSD), stb (MIT / public domain), fpattern, Fallout Classic Dialog font (MIT), PT Mono font (SIL OFL 1.1). Existing component texts are available in Settings → About. That list does not yet cover every inherited component described below.
 
-Credits: Alexander Batalov and the Fallout 2 CE contributors for the engine; the sfall, RPU and Inventory Filter authors, whose features are reimplemented here by their behavior (no code taken).
+Credits: Alexander Batalov and the Community Engine contributors for the engine; imbaner for the Android port and redesigned shared touch UI; tehbadge’s downstream development for the iOS adaptation and additional fixes. Thanks to the sfall, RPU and Inventory Filter authors for their work and compatible behavior.
+
+Compatibility implementations and redistributed components are distinct: this repository includes sfall’s compiled `gl_highlighting.int` and matching `barter_e.frm`, `trade_e.frm` and `iface_apbar_e.frm` resources. [sfall’s repository](https://github.com/sfall-team/sfall) carries GPLv3; historical questions about component-specific terms, source/build materials and distribution compatibility remain unresolved. This notice is not a completed GPL compliance package or a relicensing of the engine.
+
+Inherited inventory artwork derives from [FISSION](https://github.com/cambragol/fission-ce) work credited to Golbolco and cambragol. Stock HRP resources have [Mash’s documented permission](https://github.com/rotators/Fo1in2/blob/master/Fallout2/Fallout1in2/f2_res_README.rtf) for noncommercial redistribution/modification with authorship preserved; historical provenance questions concerning modified HRP/Sonora-related resources, selected CE interface art and platform icons remain unresolved. Fonts and other dependencies retain their own notices. This noncommercial hobbyist fork preserves inherited resources, licenses, notices and attribution. Broad investigations of unchanged upstream materials are outside this publication phase; the four proposed maintainer inquiries are canceled. Active diligence covers materials newly introduced or materially modified downstream, without treating historical questions as legally resolved. See [publication preparation](docs/ios-port/STATUS.md#publication-preparation) for remaining work; public source and binary distribution are not cleared by these documentation updates alone.
 
 ---
 
 # Fallout 2: Community Engine
+
+The following inherited CE reference documents the engine’s broader capabilities and upstream releases; it is not downstream iOS release acceptance. Mobile-specific instructions above take precedence.
 
 Fallout 2:CE is a fully working re-implementation of the classic Fallout engine, optimized for a hassle-free experience on multiple platforms, including Windows, Mac, iOS, Android, and Linux.  It provides high resolution support, quality-of-life improvements, and dozens upon dozens of bug fixes.
 
@@ -80,7 +110,7 @@ Popular total conversion mods are supported:
 
 CE has broad (though not total) compatibility with [Sfall](https://github.com/sfall-team/sfall) scripting extensions.  Many traditional Fallout mods work out of the box, including NPC Armor, Party Orders, FO2Tweaks (we recommend v14.5+), Talking Heads, and many others.
 
-## Installation — [Download Latest CE Release](https://github.com/fallout2-ce/fallout2-ce/releases)
+## Inherited CE installation reference — [Upstream CE releases](https://github.com/fallout2-ce/fallout2-ce/releases)
 
 You *must* own the game to play. Purchase your copy on [GOG](https://www.gog.com/game/fallout_2), [Epic Games](https://store.epicgames.com/p/fallout-2) or [Steam](https://store.steampowered.com/app/38410).
 
@@ -162,13 +192,16 @@ party_trade_from_menu=1
 party_loot_and_barter=1
 ```
 
+**Desktop/legacy CE configuration reference:** the mobile touch-only build chooses its game geometry automatically. Use Settings for mobile UI size, screen layouts and display choices rather than these manual sizing examples.
+
 **Recommendations:**
+
 - **Desktops**: Use any size you see fit.
 - **Tablets**: Set these values to logical resolution of your device, for example iPad Pro 11 is 1668x2388 (pixels), but its logical resolution is 834x1194 (points).
 - **Mobile phones**: Set height to 480, calculate width according to your device screen (aspect) ratio, for example Samsung S21 is 20:9 device, so the width should be 480 * 20 / 9 = 1067.
 
-In time this stuff will receive an in-game interface, right now you have to do it manually. To see all currently working fallout2.cfg settings, just run the game once and quit. It will be automatically updated with defaults for every supported setting.
-*Note*: Use of the IFACE_BAR settings requires the `f2_res.dat` file, which contains graphical assets. Various versions are available, but one compatible with the above settings can be found here: [f2_res.dat](https://github.com/fallout2-ce/fallout2-ce/raw/refs/heads/main/files/f2_res.dat)
+The mobile Settings screen exposes many of these choices; advanced options remain in `fallout2.cfg`. Running and quitting the game writes supported defaults to the configuration.
+*Note*: Legacy IFACE_BAR graphics use optional `f2_res.dat`. The inherited [upstream resource reference](https://github.com/fallout2-ce/fallout2-ce/raw/refs/heads/main/files/f2_res.dat) is not a required iOS download or a statement that all resource permissions are resolved; the current iOS CI ZIP excludes it.
 
 Note: There are a few settings that are still configured in `ddraw.ini`.  They will be migrated to cfg over time.
 
@@ -215,45 +248,11 @@ $ mv fallout2 /Applications/Fallout2
 
 ### Android
 
-> **NOTE**: Fallout 2 was designed with mouse in mind. There are many controls that require precise cursor positioning, which is not possible with fingers. Current control scheme resembles trackpad usage:
-- One finger moves mouse cursor around.
-- Tap one finger for left mouse click.
-- Tap two fingers for right mouse click (switches mouse cursor mode).
-- Move two fingers to scroll current view (map view, worldmap view, inventory scrollers).
-
-> **NOTE**: From Android standpoint release and debug builds are different apps. Both apps require their own copy of game assets and have their own savegames. This is intentional. As a gamer just stick with release version and check for updates.
-
-- Download the Android [release](https://github.com/fallout2-ce/fallout2-ce/releases), which contains an .apk file and `ce.dat`.
-
-- Use Windows installation as a base - it contains data assets needed to play. Copy `Fallout2` folder to your device, for example to `Downloads`. You need `master.dat`, `critter.dat`, `patch000.dat`, and `data` folder. Watch for file names - keep (or make) them lowercased (see [Configuration](#configuration)).  Copy `ce.dat` into this folder.
-
-- Copy `fallout2-ce.apk` from the release to your device. Open it with file explorer, follow instructions (install from unknown source).
-
-- When you run the game for the first time it will immediately present file picker. Select the folder from the first step. Wait until this data is copied. A loading dialog will appear, just wait for about 30 seconds. If you're installing total conversion mod or localized version with a large number of unpacked resources in `data` folder it can take up to 20 minutes. Once copied, the game will start automatically.
+For this mobile fork, use [Install on Android](#install-on-android). Community Engine’s legacy cursor controls and installer are separate from the redesigned mobile UI.
 
 ### iOS
 
-> **NOTE**: See Android note on controls.
-
-- Download `fallout2-ce.ipa`. Use sideloading applications ([AltStore](https://altstore.io/) or [Sideloadly](https://sideloadly.io/)) to install it to your device. Alternatively you can always build from source with your own signing certificate.
-
-- Run the game once. You'll see error message saying "Couldn't find/load text fonts". This step is needed for iOS to expose the game via File Sharing feature.
-
-- Use Finder (macOS Catalina and later) or iTunes (Windows and macOS Mojave or earlier) to copy `master.dat`, `critter.dat`, `patch000.dat`, `ce.dat`, and `data` folder to "Fallout 2" app ([how-to](https://support.apple.com/HT210598)). Watch for file names - keep (or make) them lowercased (see [Configuration](#configuration)).
-
--
-
-**Controls on iPad:**
-
-- One-finger tap → left click; hold → left button held.
-- Two-finger tap → right click (cycles cursor mode between walk and attack).
-- One-finger drag → scroll map / windows.
-- Two-finger drag → mouse wheel.
-- **Three-finger swipe down → ESC** (opens options / main menu).
-- **Four-finger long press → F6** (quicksave). Hold four fingers on the screen for about half a second.
-- **Three-finger long press → hold Shift** (highlights interactable objects — containers, doors, items — while held).
-- Taps on the HUD (interface bar / end-turn / end-combat buttons) act as direct touches so small buttons are easy to hit without aiming.
-- A Bluetooth keyboard works for everything else (numbered dialog choices, load game, etc.).
+For this downstream, use [Install on iOS / iPadOS](#install-on-ios--ipados) and [iOS build instructions](CONTRIBUTING.md#ios--ipados). The shared touch UI replaces the inherited CE trackpad/toolbar controls.
 
 ### Browser
 
@@ -283,3 +282,5 @@ For current sfall compatibility status and the remaining work needed to close ga
 ## License
 
 The source code is this repository is available under the [Sustainable Use License](LICENSE.md).
+
+[Русская версия](README.ru.md)

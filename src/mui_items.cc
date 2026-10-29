@@ -265,6 +265,12 @@ void muiDrawItemCell(MuiContext& ui, const MuiRect& rect, Object* item, int quan
     }
 }
 
+MuiRect muiDraggedItemRect(const MuiContext& ui)
+{
+    float size = ui.dp(64.0f);
+    return { ui.pointerX() - size / 2.0f, ui.pointerY() - size * 1.1f, size, size };
+}
+
 void muiDrawDraggedItem(MuiContext& ui, Object* item, int quantity, int price)
 {
     const MuiTheme& theme = muiTheme();
@@ -273,8 +279,7 @@ void muiDrawDraggedItem(MuiContext& ui, Object* item, int quantity, int price)
     // the item goes over them.
     ui.drawScrollMarks();
 
-    float size = ui.dp(64.0f);
-    MuiRect cell = { ui.pointerX() - size / 2.0f, ui.pointerY() - size * 1.1f, size, size };
+    MuiRect cell = muiDraggedItemRect(ui);
     muiDrawItemCell(ui, cell, item, quantity, true);
 
     std::u32string name = muiDecodeGameText(objectGetName(item));

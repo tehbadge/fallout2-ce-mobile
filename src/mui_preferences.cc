@@ -1,6 +1,10 @@
 #include "mui.h"
 #include "mui_screens.h"
 
+#ifdef __IPHONEOS__
+#include "platform/ios/crt_renderer.h"
+#endif
+
 #include <stdio.h>
 
 #include <algorithm>
@@ -145,6 +149,7 @@ namespace {
     constexpr int kTextKarmaChangesNote = 357;
     constexpr int kTextBonusDamage = 358;
     constexpr int kTextBonusDamageNote = 359;
+    constexpr int kTextGameMenuQuickActions = 496;
     constexpr int kTextQuickSaves = 360;
     constexpr int kTextQuickSavesNote = 361;
     constexpr int kTextQuickSavesOff = 362;
@@ -222,6 +227,9 @@ namespace {
         bool worldmapFollow;
         bool tacticalView;
         bool saveCompatibility;
+#ifdef __IPHONEOS__
+        bool gameMenuQuickActions;
+#endif
         bool barterUnitPrice;
         int interfaceSize;
         int windows;
@@ -250,6 +258,9 @@ namespace {
         values.worldmapFollow = settings.enhancements.worldmap_follow_party;
         values.tacticalView = settings.enhancements.tactical_view;
         values.saveCompatibility = settings.enhancements.save_compatibility;
+#ifdef __IPHONEOS__
+        values.gameMenuQuickActions = settings.touch.game_menu_quick_actions;
+#endif
         values.barterUnitPrice = settings.enhancements.barter_unit_price;
         values.interfaceSize = settings.touch.hud_scale;
         values.windows = settings.touch.windows;
@@ -279,6 +290,9 @@ namespace {
         values.worldmapFollow = EnhancementSettings().worldmap_follow_party;
         values.tacticalView = EnhancementSettings().tactical_view;
         values.saveCompatibility = EnhancementSettings().save_compatibility;
+#ifdef __IPHONEOS__
+        values.gameMenuQuickActions = TouchSettings().game_menu_quick_actions;
+#endif
         values.barterUnitPrice = EnhancementSettings().barter_unit_price;
         values.interfaceSize = TouchSettings().hud_scale;
         values.windows = TouchSettings().windows;
@@ -358,6 +372,9 @@ namespace {
         settings.enhancements.worldmap_follow_party = values.worldmapFollow;
         settings.enhancements.tactical_view = values.tacticalView;
         settings.enhancements.save_compatibility = values.saveCompatibility;
+#ifdef __IPHONEOS__
+        settings.touch.game_menu_quick_actions = values.gameMenuQuickActions;
+#endif
         settings.enhancements.barter_unit_price = values.barterUnitPrice;
         settings.touch.hud_scale = values.interfaceSize;
         settings.touch.windows = values.windows;
@@ -449,6 +466,9 @@ namespace {
         Choice,
         Toggle,
         Slider,
+#ifdef __IPHONEOS__
+        Crt, // Runtime-only choice, outside Values and Apply/Reset.
+#endif
     };
 
     // Where a setting comes from: the game's window, Fallout 2 CE, this port.
@@ -670,7 +690,15 @@ namespace {
             rows.push_back(row);
         }
 
+#ifdef __IPHONEOS__
+        rows.push_back({ Section::Display, RowKind::Crt, -1, "CRT", Origin::Port });
+#endif
+
         header(Section::Display, kTextGroupInterface, "Interface");
+#ifdef __IPHONEOS__
+        toggle(Section::Display, kTextGameMenuQuickActions, "Quick Save/Load in Game Menu", Origin::Port, &Values::gameMenuQuickActions);
+#endif
+
         {
             Row row { Section::Display, RowKind::Choice, kTextFont, "Font", Origin::Port, kTextFontNote, "Classic: the game's dialog font redrawn" };
             row.options = { kTextFontClassic, kTextFontModern };
@@ -831,7 +859,11 @@ namespace {
         int id = row.options[index];
         if (row.optionsFromCe) {
             static const char* const kFallbacks[] = { "Pixels", "Smooth", "Sharp" };
-            return muiDecodeGameText(muiText(id, kFallbacks[std::min(index, 2)]));
+            const char* fallback = kFallbacks[std::min(index, 2)];
+            // Font labels may be absent from older or untranslated ce.msg files.
+            if (id == kTextFontClassic) fallback = "Classic";
+            if (id == kTextFontModern) fallback = "Modern";
+            return muiDecodeGameText(muiText(id, fallback));
         }
 
         MessageListItem item;
@@ -844,7 +876,8 @@ namespace {
 
     bool PreferencesScreen::changed(const Row& row) const
     {
-        return row.kind != RowKind::Header && row.get(edited) != row.get(applied);
+        // Headers and runtime-only rows have no persisted Values accessor.
+        return row.get && row.get(edited) != row.get(applied);
     }
 
     bool PreferencesScreen::anyChanged() const
@@ -1247,7 +1280,12 @@ namespace {
             float height = rowHeight(ui, row, rect.w);
             MuiRect rowRect = { rect.x, y, rect.w, height };
             if (rowRect.bottom() >= rect.y && rowRect.y <= rect.bottom()) {
-                buildRow(ui, index, rowRect);
+                MuiContext rowUi = ui;
+                // Rendering clips do not clip input. Keep controls outside
+                // the viewport from intercepting the header or footer.
+                rowUi.isInteractive = ui.isInteractive && rowRect.y + ui.dp(tall ? 12.0f : 8.0f) >= rect.y
+                    && rowRect.y + lineHeight(ui, row) - ui.dp(tall ? 12.0f : 8.0f) <= rect.bottom();
+                buildRow(rowUi, index, rowRect);
             }
             y += height;
         }
@@ -1302,7 +1340,11 @@ namespace {
         // only its own.
         float line = lineHeight(ui, row);
         float controlWidth;
-        if (row.kind == RowKind::Choice) {
+        bool isChoice = row.kind == RowKind::Choice;
+#ifdef __IPHONEOS__
+        isChoice = isChoice || row.kind == RowKind::Crt;
+#endif
+        if (isChoice) {
             controlWidth = std::min(rect.w * 0.6f, ui.dp(400.0f));
         } else if (row.kind == RowKind::Toggle) {
             controlWidth = ui.dp(52.0f);
@@ -1336,7 +1378,12 @@ namespace {
 
         float badgeSize = ui.dp(tall ? 12.0f : 10.0f);
         float badgeWidth = badge.empty() ? 0.0f : muiTextWidth(badge, badgeSize) + ui.dp(10.0f);
-        float labelSize = muiFitTextSize(label, labelRect.w - (badge.empty() ? 0.0f : badgeWidth + ui.dp(6.0f)), ui.dp(tall ? 16.0f : 14.0f), ui.dp(11.0f));
+        float minLabelSize = ui.dp(11.0f);
+#ifdef __IPHONEOS__
+        // The long relocation label still needs a lower floor on narrow phones.
+        if (row.textId == kTextGameMenuQuickActions) minLabelSize = ui.dp(9.0f);
+#endif
+        float labelSize = muiFitTextSize(label, labelRect.w - (badge.empty() ? 0.0f : badgeWidth + ui.dp(6.0f)), ui.dp(tall ? 16.0f : 14.0f), minLabelSize);
         muiDrawTextAligned(label, labelRect, labelSize, theme.text, MuiAlign::Start, MuiAlign::Center);
 
         if (!badge.empty()) {
@@ -1360,6 +1407,17 @@ namespace {
 
         // By its name's text: stays when rows move (automated tests).
         std::string id = "prefs.rows." + std::to_string(row.textId);
+#ifdef __IPHONEOS__
+        if (row.kind == RowKind::Crt) {
+            static const std::vector<std::u32string> models { U"Off", U"Tonytron", U"Arcade", U"Consumer TV" };
+            int selected = static_cast<int>(iosCrtGetModel());
+            if (ui.segmented("prefs.rows.crt", control, models, &selected)) {
+                iosCrtSetModel(static_cast<IosCrtModel>(selected));
+                _gsound_red_butt_press(-1, 0);
+            }
+            return;
+        }
+#endif
         Values before = edited;
         float value = row.get(edited);
 
@@ -1411,6 +1469,9 @@ namespace {
             }
             break;
         }
+#ifdef __IPHONEOS__
+        case RowKind::Crt:
+#endif
         case RowKind::Header:
             break;
         }

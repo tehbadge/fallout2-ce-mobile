@@ -1,0 +1,33 @@
+# Loaded by CMAKE_USER_MAKE_RULES_OVERRIDE after the toolchain and platform
+# information, before compiler checks use it (including nested try_compile).
+if(NOT APPLE)
+    return()
+endif()
+# An empty pre-project normal value may hide a toolchain's cache value.
+if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    unset(CMAKE_OSX_DEPLOYMENT_TARGET)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET OR CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
+    endif()
+    set(_fallout_default_architectures "arm64")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
+    endif()
+    set(_fallout_default_architectures "x86_64;arm64")
+else()
+    return()
+endif()
+# Update both the normal value and cache: toolchains can supply either, and
+# a normal value must not shadow the enforced minimum with an older target.
+set(_fallout_deployment_target "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+unset(CMAKE_OSX_DEPLOYMENT_TARGET)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "${_fallout_deployment_target}" CACHE STRING "Minimum OS version" FORCE)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "${_fallout_deployment_target}")
+unset(_fallout_deployment_target)
+if(NOT CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "${_fallout_default_architectures}" CACHE STRING "Build architectures" FORCE)
+endif()
+unset(_fallout_default_architectures)

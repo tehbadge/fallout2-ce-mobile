@@ -4,15 +4,14 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 set(EXECUTABLE_NAME fallout2-ce)
 
-if(APPLE)
-    if(IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "12" CACHE STRING "")
-        set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
-    else()
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "")
-        set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "")
-    endif()
+# Let project() resolve the target/toolchain before choosing Apple defaults.
+# An empty normal value defers CMake's host deployment default without caching
+# a value that would preempt deployment settings supplied by a toolchain.
+if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
+# This documented hook runs before compiler checks and also in try_compile().
+set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/AppleDeploymentTarget.cmake")
 
 project(${EXECUTABLE_NAME})
 
@@ -58,6 +57,9 @@ endif()
 
 # Git Info
 include("cmake/gitver.cmake")
+
+include(cmake/TrustedMuiFonts.cmake)
+target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Shared engine sources — used by both game and mapper targets.
 # Excludes main.cc/main.h (game-only entry logic).
@@ -181,6 +183,9 @@ set(FALLOUT_ENGINE_SOURCES
     "src/light.h"
     "src/lips.cc"
     "src/lips.h"
+    "src/death_subtitle.cc"
+    "src/mui_font_data.cc"
+    "src/save_preview_png.cc"
     "src/loadsave.cc"
     "src/save_catalog.cc"
     "src/save_storage.cc"
@@ -476,7 +481,16 @@ if(FALLOUT_APP_VERSION)
 endif()
 
 if(IOS)
+    target_link_libraries(${EXECUTABLE_NAME} "-framework Metal" "-framework QuartzCore")
+    # Reuse the shared mobile UI/input path without changing other targets.
+    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_FORCE_TOUCH_ONLY=1)
     target_sources(${EXECUTABLE_NAME} PUBLIC
+        "src/platform/ios/crt_renderer.h"
+        "src/platform/ios/crt_renderer.mm"
+        "src/platform/ios/crt_scaling.h"
+        "src/platform/ios/display_geometry.h"
+        "src/platform/ios/display_metrics.h"
+        "src/platform/ios/display_metrics.mm"
         "src/platform/ios/paths.h"
         "src/platform/ios/paths.mm"
         "src/platform/ios/quick_toolbar.h"
@@ -847,7 +861,7 @@ if((NOT ANDROID) AND (NOT IOS) AND (NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten"))
     endif()
 
     target_include_directories(mapper-ce PUBLIC "third_party/lodepng")
-    target_include_directories(mapper-ce PRIVATE "third_party/stb")
+    target_include_directories(mapper-ce PRIVATE "third_party/stb" "${CMAKE_CURRENT_BINARY_DIR}")
     target_include_directories(mapper-ce PRIVATE "src")
     target_include_directories(mapper-ce PRIVATE ${ZLIB_INCLUDE_DIRS})
     target_include_directories(mapper-ce PRIVATE ${SDL2_INCLUDE_DIRS})
@@ -936,13 +950,124 @@ endif()
 # builds: `cmake --build <build> --target <name>`, then `ctest` in <build>.
 if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
     enable_testing()
+    add_custom_target(regression_tests)
 
     function(ce_add_test name)
         add_executable(${name} EXCLUDE_FROM_ALL "tests/${name}.cc" ${ARGN})
         target_include_directories(${name} PRIVATE "src")
+        target_compile_options(${name} PRIVATE -UNDEBUG)
+        add_dependencies(regression_tests ${name})
         add_test(NAME ${name} COMMAND ${name})
     endfunction()
 
+    ce_add_test(asset_hardening_test "src/death_subtitle.cc" "src/mui_font_data.cc"
+        "src/save_preview_png.cc" "third_party/lodepng/lodepng.cpp")
+    target_include_directories(asset_hardening_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "third_party/lodepng" "third_party/stb" ${ZLIB_INCLUDE_DIRS})
+    target_link_libraries(asset_hardening_test PRIVATE ${ZLIB_LIBRARIES})
+    target_compile_definitions(asset_hardening_test PRIVATE FONT_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/files/ce.dat/fonts")
+    target_compile_options(asset_hardening_test PRIVATE -UNDEBUG)
+    target_compile_definitions(asset_hardening_test PRIVATE LODEPNG_NO_COMPILE_ALLOCATORS)
+
     ce_add_test(save_catalog_test "src/save_catalog.cc" "src/save_records.cc" "src/save_storage.cc")
     ce_add_test(sound_tempo_test "src/sound_tempo.cc")
+    ce_add_test(mui_texture_lifetime_test "src/mui.cc")
+    target_include_directories(mui_texture_lifetime_test PRIVATE ${SDL2_INCLUDE_DIRS} "third_party/stb")
+    target_link_libraries(mui_texture_lifetime_test PRIVATE ${SDL2_LIBRARIES})
+    target_compile_options(mui_texture_lifetime_test PRIVATE -ffunction-sections -fdata-sections)
+    if(APPLE)
+        target_link_options(mui_texture_lifetime_test PRIVATE -Wl,-dead_strip)
+    else()
+        target_link_options(mui_texture_lifetime_test PRIVATE -Wl,--gc-sections)
+    endif()
+    ce_add_test(ios_crt_scaling_test)
+    target_compile_options(ios_crt_scaling_test PRIVATE -UNDEBUG)
+    ce_add_test(ios_display_geometry_test)
+    target_compile_options(ios_display_geometry_test PRIVATE -UNDEBUG)
+
+    # Exercise the production menu layout with drawing, scrolling and input stubs.
+    ce_add_test(mui_main_menu_test "src/mainmenu.cc")
+    target_include_directories(mui_main_menu_test PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(mui_main_menu_test PRIVATE ${SDL2_LIBRARIES})
+    target_compile_options(mui_main_menu_test PRIVATE -UNDEBUG)
+
+    # Compile the same harness with the iOS platform and touch-only guards.
+    add_executable(mui_main_menu_ios_test EXCLUDE_FROM_ALL tests/mui_main_menu_test.cc src/mainmenu.cc)
+    target_include_directories(mui_main_menu_ios_test PRIVATE src ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(mui_main_menu_ios_test PRIVATE ${SDL2_LIBRARIES})
+    target_compile_definitions(mui_main_menu_ios_test PRIVATE __IPHONEOS__=1 FALLOUT_FORCE_TOUCH_ONLY=1)
+    target_compile_options(mui_main_menu_ios_test PRIVATE -UNDEBUG)
+    add_dependencies(regression_tests mui_main_menu_ios_test)
+    add_test(NAME mui_main_menu_ios_test COMMAND mui_main_menu_ios_test)
+    # Retain the real title event loop; discard unused asset-backed menu code.
+    foreach(menu_test mui_main_menu_test mui_main_menu_ios_test)
+        target_compile_options(${menu_test} PRIVATE -ffunction-sections -fdata-sections)
+        if(APPLE)
+            target_link_options(${menu_test} PRIVATE -Wl,-dead_strip)
+        else()
+            target_link_options(${menu_test} PRIVATE -Wl,--gc-sections)
+        endif()
+    endforeach()
+
+    foreach(quick_test hud_quick_actions_test hud_quick_actions_ios_test)
+        add_executable(${quick_test} EXCLUDE_FROM_ALL tests/hud_quick_actions_test.cc src/hud_layout.cc)
+        target_include_directories(${quick_test} PRIVATE src ${SDL2_INCLUDE_DIRS})
+        target_link_libraries(${quick_test} PRIVATE ${SDL2_LIBRARIES})
+        target_compile_options(${quick_test} PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+        if(APPLE)
+            target_link_options(${quick_test} PRIVATE -Wl,-dead_strip)
+        else()
+            target_link_options(${quick_test} PRIVATE -Wl,--gc-sections)
+        endif()
+        add_dependencies(regression_tests ${quick_test})
+        add_test(NAME ${quick_test} COMMAND ${quick_test})
+    endforeach()
+    target_compile_definitions(hud_quick_actions_ios_test PRIVATE __IPHONEOS__=1 FALLOUT_FORCE_TOUCH_ONLY=1)
+
+    ce_add_test(game_menu_quick_actions_settings_test)
+    target_include_directories(game_menu_quick_actions_settings_test PRIVATE ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(game_menu_quick_actions_settings_test PRIVATE ${SDL2_LIBRARIES})
+    target_compile_definitions(game_menu_quick_actions_settings_test PRIVATE __IPHONEOS__=1 FALLOUT_FORCE_TOUCH_ONLY=1)
+    target_compile_options(game_menu_quick_actions_settings_test PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+    if(APPLE)
+        target_link_options(game_menu_quick_actions_settings_test PRIVATE -Wl,-dead_strip)
+    else()
+        target_link_options(game_menu_quick_actions_settings_test PRIVATE -Wl,--gc-sections)
+    endif()
+
+    # Tests the real immediate-mode input handlers with drawing stubs. Discard
+    # unused engine entry points from the included mui.cc implementation.
+    foreach(slider_test mui_slider_test mui_slider_ios_test)
+        add_executable(${slider_test} EXCLUDE_FROM_ALL tests/mui_slider_test.cc)
+        target_include_directories(${slider_test} PRIVATE src ${SDL2_INCLUDE_DIRS})
+        target_link_libraries(${slider_test} PRIVATE ${SDL2_LIBRARIES})
+        target_compile_options(${slider_test} PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+        if(APPLE)
+            target_link_options(${slider_test} PRIVATE -Wl,-dead_strip)
+        else()
+            target_link_options(${slider_test} PRIVATE -Wl,--gc-sections)
+        endif()
+        add_dependencies(regression_tests ${slider_test})
+        add_test(NAME ${slider_test} COMMAND ${slider_test})
+    endforeach()
+    target_compile_definitions(mui_slider_ios_test PRIVATE __IPHONEOS__=1 FALLOUT_FORCE_TOUCH_ONLY=1)
+    # Source-extraction harnesses compile small fixtures, not the full game.
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME equipment_drop_control_flow_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/equipment_drop_control_flow_test.py
+            --cxx ${CMAKE_CXX_COMPILER} --output-dir ${CMAKE_CURRENT_BINARY_DIR}/equipment-test)
+    set(preferences_sdl_includes ${SDL2_INCLUDE_DIRS})
+    if(FALLOUT_VENDORED)
+        # Python compiles outside CMake, so it needs SDL's header paths that
+        # C++ targets normally inherit through SDL2-static.
+        FetchContent_GetProperties(sdl2 SOURCE_DIR sdl_source BINARY_DIR sdl_binary)
+        list(APPEND preferences_sdl_includes "${sdl_source}/include" "${sdl_binary}/include")
+    endif()
+    set(preferences_test_includes)
+    foreach(include_dir IN LISTS preferences_sdl_includes)
+        list(APPEND preferences_test_includes --sdl-include ${include_dir})
+    endforeach()
+    add_test(NAME preferences_integration_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/preferences_integration_test.py
+            --cxx ${CMAKE_CXX_COMPILER} --output-dir ${CMAKE_CURRENT_BINARY_DIR}/preferences-test
+            ${preferences_test_includes})
 endif()

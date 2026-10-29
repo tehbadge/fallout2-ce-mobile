@@ -14,6 +14,7 @@
 #include <iterator>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "save_catalog.h"
 #include "save_records.h"
@@ -335,6 +336,29 @@ int main(int argc, char** argv)
             CHECK(save(20 + index, static_cast<char>('p' + index)));
         }
         std::int64_t manualOrder = range.entry(20).order;
+        std::vector<SaveCatalog::Entry> before;
+        std::vector<SaveRecord> beforeRecords;
+        for (int slot = 0; slot < 25; slot++) {
+            if (range.entry(slot).identity != 0) {
+                before.push_back(range.entry(slot));
+                SaveRecord savedRecord;
+                CHECK(rangeRecords.find(slot, range.entry(slot).recordId, &savedRecord));
+                savedRecord.composition = "fixture-" + std::to_string(slot);
+                CHECK(rangeRecords.put(slot, range.entry(slot).recordId, savedRecord));
+                beforeRecords.push_back(savedRecord);
+            }
+        }
+        auto findSave = [&](const SaveCatalog::Entry& saved) {
+            int found = -1;
+            for (int slot = 0; slot < 1000; slot++) {
+                if (range.entry(slot).recordId == saved.recordId) {
+                    CHECK(found == -1); // No duplicate or lost save identities.
+                    found = slot;
+                }
+            }
+            CHECK(found != -1);
+            return found;
+        };
 
         // 20 quick: the manual saves in 20-24 leave the range (to 5-9).
         int permanent = -1;
@@ -348,10 +372,30 @@ int main(int argc, char** argv)
         // 5 newest move into it.
         CHECK(range.quickOverflow(10, 5) == 5);
         CHECK(range.setQuickRange(10, 5, &permanent) && permanent == 5);
-        CHECK(at(10) == snapshot('F') && at(14) == snapshot('J'));
-        CHECK(at(30) == snapshot('A') && at(34) == snapshot('E') && !range.isQuick(30));
-        CHECK(!range.entry(15).present && present() == 20);
-        CHECK(range.nextQuick() == 10);
+        // Retention is chronological, not ascending physical slot order:
+        // newest-first processing places J..F in the available quick slots.
+        CHECK(present() == 20);
+        for (size_t index = 0; index < before.size(); index++) {
+            const auto& saved = before[index];
+            int slot = findSave(saved);
+            const auto& current = range.entry(slot);
+            CHECK(current.identity == saved.identity && current.created == saved.created && current.order == saved.order);
+            SaveRecord metadata;
+            CHECK(rangeRecords.find(slot, saved.recordId, &metadata));
+            CHECK(metadata.created == saved.created && metadata.order == saved.order);
+            CHECK(metadata.composition == beforeRecords[index].composition);
+            // The five newest quick saves (F..J) remain quick; all manual
+            // saves and the older A..E are permanent, with unchanged data.
+            bool retained = index >= 10 && index < 15;
+            CHECK(range.isQuick(slot) == retained);
+            char value = index < 5 ? 'a' + index : index < 15 ? 'A' + index - 5 : 'p' + index - 15;
+            CHECK(at(slot) == snapshot(value));
+        }
+        for (size_t index = 11; index < 15; index++) {
+            CHECK(range.entry(findSave(before[index])).order > range.entry(findSave(before[index - 1])).order);
+        }
+        CHECK(range.nextQuick() == findSave(before[10])); // F, oldest retained.
+        CHECK(!range.entry(15).present);
 
         // Off: every quick save becomes manual where it is.
         CHECK(range.setQuickRange(10, 0, &permanent) && permanent == 5);
@@ -359,11 +403,21 @@ int main(int argc, char** argv)
 
         // A save moved without its record (a stop between the rename and the
         // records): the next refresh gives it back.
-        std::int64_t order = range.entry(10).order;
+        SaveCatalog::Entry moving = range.entry(10);
+        SaveRecord movingRecord;
+        CHECK(rangeRecords.find(10, moving.recordId, &movingRecord));
+        std::string movingData = at(10);
+        std::int64_t order = moving.order;
         CHECK(storage::move(saves + "/SLOT11", saves + "/SLOT51"));
         CHECK(range.refresh() && range.entry(50).order == order);
+        CHECK(!range.entry(10).present && range.entry(50).recordId == moving.recordId);
+        CHECK(range.entry(50).identity == moving.identity && range.entry(50).created == moving.created);
+        CHECK(at(50) == movingData && range.nextQuick() == -1);
         SaveRecord moved;
-        CHECK(rangeRecords.find(50, range.entry(50).recordId, &moved) && !rangeRecords.find(10, range.entry(50).recordId, &moved));
+        CHECK(rangeRecords.find(50, moving.recordId, &moved));
+        CHECK(moved.created == moving.created && moved.order == moving.order);
+        CHECK(moved.composition == movingRecord.composition);
+        CHECK(!rangeRecords.find(10, moving.recordId, &moved));
 
         CHECK(storage::removeTree(saves) && storage::removeTree(saves + "-records.txt"));
     }

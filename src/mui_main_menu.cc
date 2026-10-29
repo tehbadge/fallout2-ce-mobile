@@ -55,8 +55,12 @@ namespace {
 
         bool coversScreen() override { return true; }
         void build(MuiContext& ui) override;
-        // Exit, as the game's menu does on Esc.
-        void back() override { choice = MAIN_MENU_EXIT; }
+        void back() override
+        {
+#ifndef __IPHONEOS__
+            choice = MAIN_MENU_EXIT;
+#endif
+        }
 
         int choice = -1;
         // Going away in windows (`muiMainMenuLeave`): the buttons fade out
@@ -104,8 +108,13 @@ namespace {
     {
         MuiRect safe = ui.safeRect();
         float margin = ui.dp(24.0f);
+        // Keep the normal layout when it fits; spend decorative vertical
+        // margins before reducing gaps or scrolling full-size controls.
+        float preferredHeight = ui.dp((44.0f + 8.0f) * (hasSaves ? 3.0f : 2.0f) + 38.0f + 30.0f
+            + (continueSlot != -1 ? 56.0f + 8.0f : 0.0f));
+        float verticalMargin = std::clamp((safe.h - preferredHeight) / 2.0f, ui.dp(8.0f), margin);
         float width = std::min(ui.dp(300.0f), safe.w * 0.42f);
-        MuiRect column = { safe.x + margin, safe.y + margin, width, safe.h - margin * 2.0f };
+        MuiRect column = { safe.x + margin, safe.y + verticalMargin, width, std::max(safe.h - verticalMargin * 2.0f, 0.0f) };
         muiDrawTitleArt(ui, column.right() + margin);
 
         // The buttons fade in and out over the picture (which stays: the
@@ -123,19 +132,31 @@ namespace {
     void MainMenuScreen::buildButtons(MuiContext& ui, const MuiRect& column)
     {
         const MuiTheme& theme = muiTheme();
-        float gap = ui.dp(8.0f);
+        float horizontalGap = ui.dp(8.0f);
         float buttonHeight = ui.dp(44.0f);
         float continueHeight = continueSlot != -1 ? ui.dp(56.0f) : 0.0f;
         float smallHeight = ui.dp(38.0f);
         float footerHeight = ui.dp(30.0f);
 
-        float height = (continueSlot != -1 ? continueHeight + gap : 0.0f) + (buttonHeight + gap) * (hasSaves ? 3.0f : 2.0f) + smallHeight;
-        float y = column.y + std::max((column.h - footerHeight - height) / 2.0f, 0.0f);
+        MuiRect viewport = { column.x, column.y, column.w, std::max(column.h - footerHeight, 0.0f) };
+        float buttonCount = hasSaves ? 3.0f : 2.0f;
+        float fixedHeight = continueHeight + buttonHeight * buttonCount + smallHeight;
+        float gapCount = buttonCount + (continueSlot != -1 ? 1.0f : 0.0f);
+        float gap = std::clamp((viewport.h - fixedHeight) / gapCount, ui.dp(2.0f), ui.dp(8.0f));
+        float height = fixedHeight + gap * gapCount;
+        float offset = ui.scroll("mainmenu", viewport, height);
+        float y = column.y + std::max((viewport.h - height) / 2.0f, 0.0f) - offset;
+
+        // Drawing clips do not clip MuiContext hit testing. Gate input outside
+        // the viewport as well, so scrolled buttons cannot cover the footer.
+        MuiContext buttonsUi = ui;
+        buttonsUi.isInteractive = ui.interactive() && viewport.contains(ui.pointerX(), ui.pointerY());
+        muiPushClip(viewport);
 
         if (continueSlot != -1) {
             MuiRect rect = { column.x, y, column.w, continueHeight };
             bool pressed = false;
-            if (ui.touchable("mainmenu.continue", rect, &pressed)) {
+            if (buttonsUi.touchable("mainmenu.continue", rect, &pressed)) {
                 choice = MAIN_MENU_CONTINUE;
             }
             muiFillRoundRect(rect, ui.dp(theme.radius), pressed ? theme.buttonPressed : theme.buttonPrimary);
@@ -165,7 +186,7 @@ namespace {
             if (button.choice == MAIN_MENU_LOAD_GAME && !hasSaves) {
                 continue;
             }
-            if (ui.button(button.id, { column.x, y, column.w, buttonHeight }, muiDecodeGameText(muiText(button.textId, button.fallback)))) {
+            if (buttonsUi.button(button.id, { column.x, y, column.w, buttonHeight }, muiDecodeGameText(muiText(button.textId, button.fallback)))) {
                 choice = button.choice;
             }
             y += buttonHeight + gap;
@@ -175,16 +196,21 @@ namespace {
         const Button small[] = {
             { "mainmenu.intro", kTextIntro, "Intro", MAIN_MENU_INTRO },
             { "mainmenu.credits", kTextCredits, "Credits", MAIN_MENU_CREDITS },
+#ifndef __IPHONEOS__
+            // Returning from SDL_main leaves the UIKit application alive.
             { "mainmenu.exit", kTextExit, "Exit", MAIN_MENU_EXIT },
+#endif
         };
-        float smallWidth = (column.w - gap * 2.0f) / 3.0f;
-        for (int index = 0; index < 3; index++) {
-            MuiRect rect = { column.x + (smallWidth + gap) * index, y, smallWidth, smallHeight };
-            if (ui.button(small[index].id, rect, muiDecodeGameText(muiText(small[index].textId, small[index].fallback)))) {
+        constexpr int smallCount = sizeof(small) / sizeof(small[0]);
+        float smallWidth = (column.w - horizontalGap * (smallCount - 1)) / smallCount;
+        for (int index = 0; index < smallCount; index++) {
+            MuiRect rect = { column.x + (smallWidth + horizontalGap) * index, y, smallWidth, smallHeight };
+            if (buttonsUi.button(small[index].id, rect, muiDecodeGameText(muiText(small[index].textId, small[index].fallback)))) {
                 choice = small[index].choice;
             }
         }
 
+        muiPopClip();
         buildFooter(ui, { column.x, column.bottom() - footerHeight, column.w * 2.0f, footerHeight });
     }
 

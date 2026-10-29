@@ -303,6 +303,9 @@
 {392}{}{Use}
 {393}{}{Unit prices when trading}
 {394}{}{Top right of an item: the price of one in this deal}
+{496}{}{Quick Save/Load in Game Menu}
+{497}{}{Quick Save}
+{498}{}{Quick Load}
 
 # The message when a party member or another critter cannot pick up an item
 # (the player's message is 905 in proto.msg).

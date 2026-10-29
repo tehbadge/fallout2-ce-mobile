@@ -842,6 +842,12 @@ int mainMenuWindowHandleEvents()
         int keyCode = inputGetInput();
 
         for (int buttonIndex = 0; buttonIndex < MAIN_MENU_BUTTON_COUNT; buttonIndex++) {
+#ifdef __IPHONEOS__
+            // Includes mod-generated keys that bypass touch-only filtering.
+            if (mainMenuButtonSpecs[buttonIndex].returnValue == MAIN_MENU_EXIT) {
+                continue;
+            }
+#endif
             int buttonKeyCode = mainMenuButtonSpecs[buttonIndex].keyCode;
             if (keyCode == buttonKeyCode || keyCode == toupper(buttonKeyCode)) {
                 // NOTE: Uninline.
@@ -888,7 +894,11 @@ int mainMenuWindowHandleEvents()
             }
         }
 
-        if (keyCode == KEY_ESCAPE || _game_user_wants_to_quit == GAME_QUIT_REQUEST_EXIT) {
+        if (
+#ifndef __IPHONEOS__
+            keyCode == KEY_ESCAPE ||
+#endif
+            _game_user_wants_to_quit == GAME_QUIT_REQUEST_EXIT) {
             rc = MAIN_MENU_EXIT;
 
             // NOTE: Uninline.
@@ -920,7 +930,11 @@ int mainMenuWindowHandleEvents()
 
 void mainMenuRequestExit()
 {
+#ifndef __IPHONEOS__
     gMainMenuExitRequested = true;
+#endif
+    // On iOS, signal_close_game still ends the current game via its separate
+    // GAME_QUIT_REQUEST_MAIN_MENU signal, but must leave the title running.
 }
 
 // NOTE: Inlined.

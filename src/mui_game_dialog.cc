@@ -1088,9 +1088,16 @@ MuiGameScreenTab muiGameScreenTabs(MuiContext& ui, const MuiRect& column, const 
         { MuiGameScreenTab::Map, "map", MuiIcon::Map },
     };
 
-    float size = column.w;
+    float size = std::min(column.w, column.h);
     float gap = ui.dp(8.0f);
-    MuiRect rect = { column.x, column.y, size, size };
+    int count = screens ? static_cast<int>(sizeof(tabs) / sizeof(tabs[0])) : 1;
+    if (count > 1) {
+        // Spend decorative gaps before shrinking buttons on short/high-scale
+        // screens. Keep every tab, including Map, inside the safe column.
+        gap = std::clamp((column.h - size * count) / (count - 1), ui.dp(2.0f), gap);
+        size = std::max(0.0f, std::min(size, (column.h - gap * (count - 1)) / count));
+    }
+    MuiRect rect = { column.centerX() - size / 2.0f, column.y, size, size };
     MuiGameScreenTab result = MuiGameScreenTab::None;
 
     for (const Tab& tab : tabs) {

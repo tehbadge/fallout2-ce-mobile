@@ -1702,6 +1702,12 @@ void touchHudClearMessages()
     gMessages.clear();
 }
 
+bool touchHudConfirmQuickLoad()
+{
+    return interfaceBarEnabled()
+        && showDialogBox(text(kTextQuickLoadConfirm), nullptr, 0, 169, 117, COLOR_AMBER, nullptr, COLOR_AMBER, DIALOG_BOX_YES_NO) != 0;
+}
+
 bool touchHudHandleEvent(int eventCode)
 {
     if (!gInitialized) {
@@ -1712,10 +1718,8 @@ bool touchHudHandleEvent(int eventCode)
     case kEventQuickLoad:
         // Game's quick load (F7), a tap is easier to hit by mistake than a
         // key, so ask first.
-        if (interfaceBarEnabled()) {
-            if (showDialogBox(text(kTextQuickLoadConfirm), nullptr, 0, 169, 117, COLOR_AMBER, nullptr, COLOR_AMBER, DIALOG_BOX_YES_NO) != 0) {
-                gameCommandPost(GameCommandType::QuickLoad);
-            }
+        if (touchHudConfirmQuickLoad()) {
+            gameCommandPost(GameCommandType::QuickLoad);
         }
         return true;
     case kEventHighlight:

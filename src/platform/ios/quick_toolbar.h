@@ -1,13 +1,15 @@
 #ifndef FALLOUT_PLATFORM_IOS_QUICK_TOOLBAR_H_
 #define FALLOUT_PLATFORM_IOS_QUICK_TOOLBAR_H_
 
+#include "../../touch.h"
+
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
 
 namespace fallout {
 
-#if defined(__APPLE__) && TARGET_OS_IOS
+#if defined(__APPLE__) && TARGET_OS_IOS && !FALLOUT_TOUCH_ONLY
 
 void quickToolbarInit();
 void quickToolbarFree();

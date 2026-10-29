@@ -1,12 +1,75 @@
 # Contributing
 
-This file is currently a shell to be filled in over time. For now, it only captures project-specific maintenance notes that are easy to miss.
+This downstream preserves Community Engine and imbaner’s shared mobile port. Keep platform changes focused, retain Android/desktop compatibility and upstream attribution, and follow [AGENTS.md](AGENTS.md) for data-preservation and publication safeguards. Use the current repository’s issue tracker when enabled for downstream work; reports about an upstream release belong with that release’s maintainer. Public issue/release links will be finalized when the public fork is authorized.
 
 For current sfall compatibility status and the remaining work needed to close gaps, see [SFALL_COMPATIBILITY.md](SFALL_COMPATIBILITY.md).
 
 ## Building
 
-The project uses CMake, so building mostly comes down to picking the right preset.
+The project uses CMake and C++17. The checked-in presets use schema version 6 and need **CMake 3.25 or later** (the older project minimum does not describe preset compatibility). Native builds fetch pinned dependencies by default; Git and network access are needed for a fresh dependency checkout. Never commit build trees, game files or signing material.
+
+### iOS / iPadOS
+
+Use macOS with **full Xcode**, its iPhoneOS SDK and command-line tools selected, Git, and CMake 3.25+. Command Line Tools alone do not provide the iPhoneOS SDK. Historical local validation used Xcode 27.1/CMake 4.4.4; the accepted hosted IPA records Xcode 15.4/SDK 17.5. These are observed build environments, not a guaranteed minimum Xcode/CMake compatibility matrix; 3.25 is the preset-parser requirement, and lower complete-build tool combinations have not been established here.
+
+From the repository root, the existing presets produce an unsigned device build:
+
+```sh
+cmake --preset ios -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+cmake --build --preset ios-debug
+```
+
+The preset uses the Xcode generator and `out/build/ios`. The deployment policy enforces **iOS/iPadOS 15.0 minimum** and defaults to arm64. `ios-release` selects **RelWithDebInfo**, despite its name. A simulator requires a separate build directory with `CMAKE_OSX_SYSROOT=iphonesimulator`; it is not device-installation evidence.
+
+The iOS configuration fetches SDL **2.32.8** into an isolated build-directory checkout and applies/verifies both `ios-scene-lifecycle.patch` and `ios-metal-snapshot.patch`. Do not patch a shared dependency checkout or override `FETCHCONTENT_SOURCE_DIR_SDL2`; verification deliberately rejects that override. Changing or bypassing patch verification is not part of a normal build.
+
+For optional unsigned packaging after the Debug build:
+
+```sh
+(cd out/build/ios && cpack -C Debug)
+```
+
+This creates `out/build/ios/fallout2-ce.ipa`. It does not sign the application, generate `ce.dat`, install it, or validate gameplay. CI’s iOS ZIP adds matching `ce.dat` and `EXAMPLE_fallout2.cfg` separately; the standalone IPA has neither resource archive.
+
+#### Matching resources
+
+Build `ce.dat` from **the same source revision** as the engine. The iOS target cannot build the host `ce-dat-tool`, so use a separate native macOS build. For example, with Ninja installed:
+
+```sh
+cmake -S . -B out/build/ce-resources -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_ARCHITECTURES="$(uname -m)"
+cmake --build out/build/ce-resources --target ce-dat-tool
+mkdir -p out/dist
+out/build/ce-resources/ce-dat-tool create files/ce.dat out/dist/ce.dat
+```
+
+The tool’s archive syntax and targets are source-verified; this exact convenience recipe was not newly executed for the documentation change. CI uses the same `create files/ce.dat` operation on Linux in [reusable-build-ce-dat.yml](.github/workflows/reusable-build-ce-dat.yml). A matching CI ZIP is another resource source for maintainers with artifact access. The private development repository is not a public download destination. Do not substitute an older CE release’s `ce.dat` for this mobile UI’s resources. `files/f2_res.dat` is optional and is not copied into the current iOS CI ZIP.
+
+#### Signing, installation and data
+
+A device installation requires Apple signing/provisioning for your account and device. Reconfigure your local device build to allow signing before opening the generated project:
+
+```sh
+cmake --preset ios -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=YES
+open out/build/ios/fallout2-ce.xcodeproj
+```
+
+Choose your development team and device in Xcode and resolve its signing/trust requirements. Keep overrides local. The preceding unsigned compile does not establish that your signing setup works. Development-signed Xcode installation was historically verified, but a fresh-user end-to-end signing/install recipe and third-party sideloading tools are not accepted distribution procedures here. Provisioning renewal depends on the account; this project supplies no credentials or profiles.
+
+Before updating an existing installation, back up Documents and identify its actual bundle ID/signing identity. Preserve that identity and install in place; do not uninstall to fix signing. The source default `com.alexbatalov.fallout2-ce` is not necessarily the identity of an existing development installation. If a local signing override changes the generated plist, derive it from the freshly generated file and preserve the complete SDL scene manifest, device families and both landscape declarations. Do not edit the tracked plist or copy a stale generated one.
+
+The app enables File Sharing and reads files from Documents. Supply your legally acquired Fallout 2 installation archives, relevant `data`/`sound` folders and matching `ce.dat` at the document root. Finder’s device Files tab is the documented transfer mechanism; historical development transfers verified the Documents path and retained saves, but not every Finder/Windows-client folder-transfer workflow. No Android-style folder/archive import UI exists on iOS. Preserve `SAVEGAME` and existing `fallout2.cfg`; use the example config as reference. See [README.md](README.md#install-on-ios--ipados) for controls and acceptance limits.
+
+### Host regression tests
+
+The existing regression suite runs on native POSIX desktop hosts, not iOS. For the CI dependency mode on Ubuntu, install CMake, a C++ compiler, SDL2/zlib development packages and Python 3, then:
+
+```sh
+cmake -S . -B out/regression -DCMAKE_BUILD_TYPE=Debug -DFALLOUT_VENDORED=OFF
+cmake --build out/regression --target regression_tests --parallel 2
+ctest --test-dir out/regression --verbose --no-tests=error
+```
+
+On macOS, use matching native-architecture SDL2/zlib development packages and Python 3; select `CMAKE_OSX_ARCHITECTURES` to match installed libraries if needed. Test targets keep assertions enabled. At historical private implementation baseline `e4cc4f1a` (preserved in the consolidated source snapshot), all **15** tests passed in the hosted Ubuntu 22.04 job. They need no purchased game archives, device or signing credentials. The iOS-guarded harnesses are host tests, not UIKit/Metal/device runtime acceptance. See [Build workflow](.github/workflows/ci-build.yml) and [current iOS status](docs/ios-port/STATUS.md#current-accepted-state-2026-10-28).
 
 ## Commandline arguments
 
@@ -121,7 +184,7 @@ Notes:
 
 ## Updating SDL
 
-SDL is pinned for native builds in `third_party/sdl2/CMakeLists.txt`. Right now, Android also relies on checked-in Java bindings in `os/android/app/src/main/java/org/libsdl/app`, and those bindings must match the SDL version fetched by CMake.
+SDL is pinned for native builds in `third_party/sdl2/CMakeLists.txt`; iOS also verifies the two patches described above, which must be reviewed against any new SDL version. Right now, Android also relies on checked-in Java bindings in `os/android/app/src/main/java/org/libsdl/app`, and those bindings must match the SDL version fetched by CMake.
 
 When updating SDL:
 

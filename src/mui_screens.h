@@ -243,7 +243,11 @@ void muiDrawItemImage(MuiContext& ui, const MuiRect& rect, Object* item, bool pr
 // top right [price] (barter: of one in the deal; < 0: not shown).
 void muiDrawItemCell(MuiContext& ui, const MuiRect& rect, Object* item, int quantity, bool pressed, int price = -1);
 
-// The dragged item under the finger: its cell ([quantity] of its stack) and,
+// The floating item preview above the finger. Shared geometry keeps drop
+// fallback aligned with the rendered image at every UI scale.
+MuiRect muiDraggedItemRect(const MuiContext& ui);
+
+// The dragged item above the finger: its cell ([quantity] of its stack) and,
 // above, its name with how many the least part that moves is (one, ammo's
 // first clip in rounds), its weight and [price] (< 0: not shown).
 void muiDrawDraggedItem(MuiContext& ui, Object* item, int quantity, int price);
