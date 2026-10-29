@@ -4,7 +4,7 @@
 
 This repository contains the source code for an iOS port. Running it requires building and signing the application yourself using Xcode. A legally acquired copy of Fallout 2 is also required to supply the original game files. The project does not distribute the original game.
 
-Unsigned iOS build artifacts may be available through development workflows, but these are not ready-to-install releases.
+The proposed public Build workflow validates source compilation and host regression tests. CI does not provide downloadable applications or resource archives. Public GitHub Actions remain disabled pending independent review and separate activation; this candidate has not run in public CI.
 
 This repository is the published unofficial downstream source fork, [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile), of [imbaner/fallout2-ce-mobile](https://github.com/imbaner/fallout2-ce-mobile), itself a fork of [Fallout 2: Community Engine](https://github.com/fallout2-ce/fallout2-ce). imbaner created the Android mobile port and redesigned touch interface. This downstream adds native iOS support and additional fixes while retaining the shared C++/SDL2 engine and mobile UI. **Early beta; public-source publication is complete. No installable iOS binary release has been approved.**
 
@@ -49,7 +49,7 @@ Plain Fallout 2 from GOG, Steam or Epic works too, with or without mods. The gam
 
 Requires an arm64 iPhone or iPad with **iOS/iPadOS 15.0 or later**. That is the build minimum, not a physical-test matrix. Both landscape orientations are supported.
 
-There is no ready-to-install iOS release from this project. The development workflow defines an **unsigned IPA** package, accompanied by matching `ce.dat` and an example configuration. GitHub Actions are disabled in this public repository; historical private runs and artifacts are not public downloads. It cannot be directly installed as an ordinary signed app. Build and sign with your own Apple development credentials; see [iOS build and resources](CONTRIBUTING.md#ios--ipados). Development-signed Xcode installations were historically tested; AltStore, Sideloadly, TestFlight and App Store distribution have not been validated for this downstream.
+There is no ready-to-install iOS release from this project. The proposed public workflow validates an **unsigned IPA** with CPack inside the runner workspace and does not upload it or matching resources. GitHub Actions are disabled in this public repository; historical private runs and artifacts are not public downloads. An unsigned IPA cannot be directly installed as an ordinary signed app. Build and sign with your own Apple development credentials; see [iOS build and resources](CONTRIBUTING.md#ios--ipados). Development-signed Xcode installations were historically tested; AltStore, Sideloadly, TestFlight and App Store distribution have not been validated for this downstream.
 
 After installing a signed build, launch it once to create its Documents directory. Launch alone cannot establish gameplay readiness without game files. Use Finder’s device **Files** tab to copy `master.dat`, `critter.dat`, `patch000.dat` where supplied by your installation, matching `ce.dat`, and the relevant `data` and `sound` folders into the app’s document root, without an extra enclosing Fallout2 folder. The app enables File Sharing and reads game files from Documents. Keep resource paths consistent with your configuration. A complete folder transfer through every Finder/Windows client is not independently validated here; Android’s folder/archive importer is not implemented on iOS.
 
@@ -201,7 +201,7 @@ party_loot_and_barter=1
 - **Mobile phones**: Set height to 480, calculate width according to your device screen (aspect) ratio, for example Samsung S21 is 20:9 device, so the width should be 480 * 20 / 9 = 1067.
 
 The mobile Settings screen exposes many of these choices; advanced options remain in `fallout2.cfg`. Running and quitting the game writes supported defaults to the configuration.
-*Note*: Legacy IFACE_BAR graphics use optional `f2_res.dat`. The inherited [upstream resource reference](https://github.com/fallout2-ce/fallout2-ce/raw/refs/heads/main/files/f2_res.dat) is not a required iOS download or a statement that all resource permissions are resolved; the current iOS CI ZIP excludes it.
+*Note*: Legacy IFACE_BAR graphics use optional `f2_res.dat`. The inherited [upstream resource reference](https://github.com/fallout2-ce/fallout2-ce/raw/refs/heads/main/files/f2_res.dat) is not a required iOS download or a statement that all resource permissions are resolved; the proposed public CI does not distribute resource archives.
 
 Note: There are a few settings that are still configured in `ddraw.ini`.  They will be migrated to cfg over time.
 
