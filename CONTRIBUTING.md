@@ -1,6 +1,6 @@
 # Contributing
 
-This downstream preserves Community Engine and imbaner’s shared mobile port. Keep platform changes focused, retain Android/desktop compatibility and upstream attribution, and follow [AGENTS.md](AGENTS.md) for data-preservation and publication safeguards. Use the current repository’s issue tracker when enabled for downstream work; reports about an upstream release belong with that release’s maintainer. Public issue/release links will be finalized when the public fork is authorized.
+This downstream preserves Community Engine and imbaner’s shared mobile port. Keep platform changes focused, retain Android/desktop compatibility and upstream attribution, and follow [AGENTS.md](AGENTS.md) for data-preservation and publication safeguards. The published downstream source is [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile). Use [downstream Issues](https://github.com/tehbadge/fallout2-ce-mobile/issues) for native iOS, downstream mobile UI, additional fixes/CRT, and source build/run questions. Original Android-release issues that reproduce on unchanged upstream should generally go to [imbaner’s tracker](https://github.com/imbaner/fallout2-ce-mobile/issues). GitHub Actions are disabled in the public fork; Auto Format and Release are also individually disabled. CI re-enablement is deferred. No installable iOS binary release has been approved.
 
 For current sfall compatibility status and the remaining work needed to close gaps, see [SFALL_COMPATIBILITY.md](SFALL_COMPATIBILITY.md).
 
@@ -29,7 +29,7 @@ For optional unsigned packaging after the Debug build:
 (cd out/build/ios && cpack -C Debug)
 ```
 
-This creates `out/build/ios/fallout2-ce.ipa`. It does not sign the application, generate `ce.dat`, install it, or validate gameplay. CI’s iOS ZIP adds matching `ce.dat` and `EXAMPLE_fallout2.cfg` separately; the standalone IPA has neither resource archive.
+This creates `out/build/ios/fallout2-ce.ipa`. It does not sign the application, generate `ce.dat`, install it, or validate gameplay. The checked-in CI packaging definition adds matching `ce.dat` and `EXAMPLE_fallout2.cfg` separately; the standalone IPA has neither resource archive.
 
 #### Matching resources
 
@@ -42,7 +42,7 @@ mkdir -p out/dist
 out/build/ce-resources/ce-dat-tool create files/ce.dat out/dist/ce.dat
 ```
 
-The tool’s archive syntax and targets are source-verified; this exact convenience recipe was not newly executed for the documentation change. CI uses the same `create files/ce.dat` operation on Linux in [reusable-build-ce-dat.yml](.github/workflows/reusable-build-ce-dat.yml). A matching CI ZIP is another resource source for maintainers with artifact access. The private development repository is not a public download destination. Do not substitute an older CE release’s `ce.dat` for this mobile UI’s resources. `files/f2_res.dat` is optional and is not copied into the current iOS CI ZIP.
+The tool’s archive syntax and targets are source-verified; this exact convenience recipe was not newly executed for the documentation change. The checked-in CI definition uses the same `create files/ce.dat` operation on Linux in [reusable-build-ce-dat.yml](.github/workflows/reusable-build-ce-dat.yml). A historical private CI ZIP is another resource source only for maintainers with access to that private artifact; public Actions are disabled. The private development repository is not a public download destination. Do not substitute an older CE release’s `ce.dat` for this mobile UI’s resources. `files/f2_res.dat` is optional and is not copied into the current iOS CI ZIP.
 
 #### Signing, installation and data
 
