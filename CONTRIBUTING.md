@@ -1,6 +1,6 @@
 # Contributing
 
-This downstream preserves Community Engine and imbaner’s shared mobile port. Keep platform changes focused, retain Android/desktop compatibility and upstream attribution, and follow [AGENTS.md](AGENTS.md) for data-preservation and publication safeguards. The published downstream source is [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile). Use [downstream Issues](https://github.com/tehbadge/fallout2-ce-mobile/issues) for native iOS, downstream mobile UI, additional fixes/CRT, and source build/run questions. Original Android-release issues that reproduce on unchanged upstream should generally go to [imbaner’s tracker](https://github.com/imbaner/fallout2-ce-mobile/issues). GitHub Actions are disabled in the public fork; Auto Format and Release are also individually disabled. The Balanced Build candidate awaits independent review and separately authorized activation; no successful public run is claimed. No installable iOS binary release has been approved.
+This downstream preserves Community Engine and imbaner’s shared mobile port. Keep platform changes focused, retain Android/desktop compatibility and upstream attribution, and follow [AGENTS.md](AGENTS.md) for data-preservation and publication safeguards. The published downstream source is [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile). Use [downstream Issues](https://github.com/tehbadge/fallout2-ce-mobile/issues) for native iOS, downstream mobile UI, additional fixes/CRT, and source build/run questions. Original Android-release issues that reproduce on unchanged upstream should generally go to [imbaner’s tracker](https://github.com/imbaner/fallout2-ce-mobile/issues). The public Balanced Build workflow is active and has passed its first public validation; see [Public CI validation](#public-ci-validation). Auto Format and Release remain disabled. No installable iOS binary release has been approved.
 
 For current sfall compatibility status and the remaining work needed to close gaps, see [SFALL_COMPATIBILITY.md](SFALL_COMPATIBILITY.md).
 
@@ -29,7 +29,7 @@ For optional unsigned packaging after the Debug build:
 (cd out/build/ios && cpack -C Debug)
 ```
 
-This creates `out/build/ios/fallout2-ce.ipa`. It does not sign the application, generate `ce.dat`, install it, or validate gameplay. The proposed public CI runs CPack only for validation and uploads no IPA, application binaries or resource archives. The standalone IPA contains neither `ce.dat` nor `EXAMPLE_fallout2.cfg`; supply matching resources separately.
+This creates `out/build/ios/fallout2-ce.ipa`. It does not sign the application, generate `ce.dat`, install it, or validate gameplay. Public CI runs CPack only for validation and uploads no IPA, application binaries or resource archives. The standalone IPA contains neither `ce.dat` nor `EXAMPLE_fallout2.cfg`; supply matching resources separately.
 
 #### Matching resources
 
@@ -42,7 +42,7 @@ mkdir -p out/dist
 out/build/ce-resources/ce-dat-tool create files/ce.dat out/dist/ce.dat
 ```
 
-The tool’s archive syntax and targets are source-verified; this exact convenience recipe was not newly executed for the documentation change. The proposed [Build workflow](.github/workflows/ci-build.yml) uses the same `create files/ce.dat` operation locally in its Linux host job; the older reusable resource workflow remains unchanged and uncalled by Build. A historical private CI ZIP is another resource source only for maintainers with access to that private artifact; public Actions are disabled. The private development repository is not a public download destination. Do not substitute an older CE release’s `ce.dat` for this mobile UI’s resources. `files/f2_res.dat` is optional; public CI does not distribute resources.
+The tool’s archive syntax and targets are source-verified; this exact convenience recipe was not newly executed for the documentation change. The active [Build workflow](.github/workflows/ci-build.yml) uses the same `create files/ce.dat` operation locally in its Linux host job; the older reusable resource workflow remains unchanged and uncalled by Build. A historical private CI ZIP is another resource source only for maintainers with access to that private artifact; public CI uploads no resources. The private development repository is not a public download destination. Do not substitute an older CE release’s `ce.dat` for this mobile UI’s resources. `files/f2_res.dat` is optional; public CI does not distribute resources.
 
 #### Signing, installation and data
 
@@ -71,9 +71,9 @@ ctest --test-dir out/regression --verbose --no-tests=error
 
 On macOS, use matching native-architecture SDL2/zlib development packages and Python 3; select `CMAKE_OSX_ARCHITECTURES` to match installed libraries if needed. Test targets keep assertions enabled. At historical private implementation baseline `e4cc4f1a` (preserved in the consolidated source snapshot), all **15** tests passed in the hosted Ubuntu 22.04 job. They need no purchased game archives, device or signing credentials. The iOS-guarded harnesses are host tests, not UIKit/Metal/device runtime acceptance. See [Build workflow](.github/workflows/ci-build.yml) and [current iOS status](docs/ios-port/STATUS.md#current-accepted-state-2026-10-28).
 
-## Public CI validation candidate
+## Public CI validation
 
-The proposed [Build workflow](.github/workflows/ci-build.yml) has three independent jobs:
+The active [Build workflow](.github/workflows/ci-build.yml) has three independent jobs:
 
 - **Host regressions and Linux engine:** Ubuntu 22.04, assertion-enabled Debug tests using the [host regression commands](#host-regression-tests), full `fallout2-ce` executable compilation, and local `ce.dat` generation. Reuse the same configuration after the regression commands:
 
@@ -87,9 +87,9 @@ The proposed [Build workflow](.github/workflows/ci-build.yml) has three independ
 - **iOS:** fresh dependencies with both SDL patches, unsigned iPhoneOS arm64 Debug compilation and CPack using the [existing presets and commands](#ios--ipados).
 - **Android:** the existing JDK 17/Gradle configuration, running `cd os/android` then `./gradlew assembleDebug` with all configured ABIs (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`), without signing secrets.
 
-After separate activation, Build is intended to run for pushes to `main`, pull requests targeting `main` (opened, synchronize and reopened), and explicit manual dispatch. Push/PR changes consisting only of Markdown files (`**/*.md`) are skipped; mixed source/documentation changes and workflow-file changes remain eligible. Manual dispatch has no path filter.
+Build runs for pushes to `main`, pull requests targeting `main` (opened, synchronize and reopened), and explicit manual dispatch. Push/PR changes consisting only of Markdown files (`**/*.md`) are skipped; mixed source/documentation changes and workflow-file changes remain eligible. Manual dispatch has no path filter.
 
-The workflow uses read-only contents permission and uploads no application binaries or resource archives. Debug APK and unsigned IPA creation are confined to the runner workspace. Compilation, regression and packaging checks do not establish physical-device gameplay, rendering, signing or installation acceptance. Record device testing separately. Historical private CI evidence above does not establish that this revised public workflow passes.
+The workflow uses read-only contents permission and uploads no build artifacts, application binaries or resource archives. Debug APK and unsigned IPA creation are temporary runner-side build operations. Compilation, regression and packaging checks do not establish signing, installation, gameplay, rendering or physical-device compatibility. Record device testing separately. The [first public validation](https://github.com/tehbadge/fallout2-ce-mobile/actions/runs/40819456524) passed all three jobs; see [current iOS status](docs/ios-port/STATUS.md#balanced-public-ci-activated-and-accepted-2026-10-28) for the milestone evidence. Historical private CI evidence above retains its separate scope.
 
 ## Commandline arguments
 
