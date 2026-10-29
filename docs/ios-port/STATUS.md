@@ -12,6 +12,14 @@ This summary supersedes candidate-era review/promotion statements below. It desc
 - **Platform and release limits:** effective deployment minimum is iOS/iPadOS **15.0**. The final integrated F2 revision still needs physical-device acceptance before an accepted binary release. An unsigned CI IPA is compilation/package evidence, not an installable consumer release. Historical user physical acceptance remains valid for the builds/features actually tested.
 - **Explicit deferrals:** F8 partial save relocation and F9 renderer-recreation allocation failure remain assessed and intentionally deferred. No additional remediation is authorized by documentation preparation.
 
+### Canonical development workflow: accepted (2026-10-29)
+
+MANAGE has accepted public `main` in `tehbadge/fallout2-ce-mobile` as the canonical source, verified at `61328090907b5702d6d3dbf2dd26f8f0aaf4daa9`. New development starts from freshly verified public `main` in isolated local feature branches/worktrees; experiments may stay local indefinitely. MANAGE reviews implementation and testing evidence before acceptance; functional acceptance does not authorize publication. A separate explicit publication decision, exact repository/branch/refspec/destination verification and appropriate validation are required. Existing public Balanced CI validates eligible published changes.
+
+The dedicated canonical local checkout is established, with `origin` pointing to the public fork, `upstream` to imbaner, `main` tracking `origin/main`, and repository-local `push.default=nothing` / `remote.pushDefault=origin`. Local configuration checks and creation of this isolated documentation worktree verify worktree isolation from canonical `main`. This is local Git setup evidence, not GitHub-hosted or runtime testing.
+
+The original private `tehbadge/fallout2-ce-mobile-ios` repository remains preserved and separate, with historical `ios-port` at `9836a20413adbfa09d5104769bfa4a061c7cfb37`; it is not a routine development baseline. Historical experimental worktrees may contain uncommitted material and ignored evidence and are intentionally untouched. Shared ancestry with imbaner's upstream remains preserved; future changes stay focused for later upstream integration.
+
 ### Balanced public CI: activated and accepted (2026-10-28)
 
 Balanced CI is implemented, published at [`ad8d6d0a954fad2953e180cf2a71151e2796c3e3`](https://github.com/tehbadge/fallout2-ce-mobile/commit/ad8d6d0a954fad2953e180cf2a71151e2796c3e3), activated and accepted by MANAGE. The [first public validation, run 40819456524](https://github.com/tehbadge/fallout2-ce-mobile/actions/runs/40819456524), completed successfully on that commit via `workflow_dispatch`, attempt 1, with exactly three successful jobs:
@@ -28,7 +36,7 @@ Historical candidate context: preparation began at public `main` / `a7a56fb14e73
 
 ### Publication preparation
 
-Public-source publication is complete. The official public source fork is [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile), with immediate GitHub fork parent [imbaner/fallout2-ce-mobile](https://github.com/imbaner/fallout2-ce-mobile). Its initial implementation commit is `c46bf1ed5476c6d37219a6025ee50d6b68c88085`, based directly on upstream `8c11b9a3d9ab1c7f3d7ab5a4e84fc2cffca0a7a8`, preserving upstream ancestry. The original 35 private downstream commits were not published; the accepted source was consolidated with privacy and publication-documentation adjustments. Device-identifying development metadata was excluded from the published history. The original private development repository `tehbadge/fallout2-ce-mobile-ios`, its `ios-port` branch and history remain separate and unchanged. The future private development workflow is undecided. No installable iOS binary release has been approved.
+Public-source publication is complete. The official public source fork is [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile), with immediate GitHub fork parent [imbaner/fallout2-ce-mobile](https://github.com/imbaner/fallout2-ce-mobile). Its initial implementation commit is `c46bf1ed5476c6d37219a6025ee50d6b68c88085`, based directly on upstream `8c11b9a3d9ab1c7f3d7ab5a4e84fc2cffca0a7a8`, preserving upstream ancestry. The original 35 private downstream commits were not published; the accepted source was consolidated with privacy and publication-documentation adjustments. Device-identifying development metadata was excluded from the published history. The original private development repository `tehbadge/fallout2-ce-mobile-ios`, its `ios-port` branch and history remain separate and unchanged. Public `main` is now canonical, with local isolated development as recorded above. No installable iOS binary release has been approved.
 
 [Downstream Issues](https://github.com/tehbadge/fallout2-ce-mobile/issues) are enabled for native iOS, downstream mobile UI, additional fixes/CRT, and source build/run questions. Unchanged upstream Android-release problems should generally go to [upstream Issues](https://github.com/imbaner/fallout2-ce-mobile/issues); [imbaner’s releases](https://github.com/imbaner/fallout2-ce-mobile/releases) remain upstream Android downloads. Public Balanced Build CI is active and accepted as recorded above; Auto Format and Release remain disabled. Historical private CI evidence below is retained with its original validation scope, not advertised as public CI or downloadable releases.
 
@@ -43,7 +51,7 @@ The app’s About source URL still points to imbaner: downstream source/attribut
 Bring the Android fork's redesigned touch-native interface to iOS using the shared engine and UI, with minimal platform-specific changes and upstream merge conflicts.
 
 - Upstream: https://github.com/imbaner/fallout2-ce-mobile
-- Local development branch: `ios-port`
+- Historical private development branch: `ios-port`
 - Original upstream baseline: `0924d6867ff3272c4134cd4c0a6d31146c6ad1db`
 - Milestone 0 implementation: `c1f51061dc535ae46dff69037325e8ff06649c9d` (`ios: add SDL2 scene lifecycle compatibility`). Independently reviewed and locally committed; playable physical-device baseline accepted.
 

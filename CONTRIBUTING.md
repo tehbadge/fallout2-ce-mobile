@@ -4,6 +4,28 @@ This downstream preserves Community Engine and imbaner’s shared mobile port. K
 
 For current sfall compatibility status and the remaining work needed to close gaps, see [SFALL_COMPATIBILITY.md](SFALL_COMPATIBILITY.md).
 
+## Local development workflow
+
+The canonical accepted source is `main` in [tehbadge/fallout2-ce-mobile](https://github.com/tehbadge/fallout2-ce-mobile); [imbaner/fallout2-ce-mobile](https://github.com/imbaner/fallout2-ce-mobile) remains the original upstream. Obtain the current public source by cloning the canonical repository, or verify an existing checkout's identity, visibility, remote URLs and branch tracking before updating it. The private `tehbadge/fallout2-ce-mobile-ios` repository and `ios-port` branch are historical references, not starting points for new work.
+
+From a clean checkout where `origin` has been verified as the canonical public repository and `main` tracks `origin/main`, for example:
+
+```sh
+git config --local push.default nothing &&
+git switch main &&
+git fetch origin &&
+git merge --ff-only origin/main &&
+test "$(git rev-parse --verify main)" = "$(git rev-parse --verify origin/main)" &&
+git worktree add -b feature/my-change ../fallout2-my-change main &&
+cd ../fallout2-my-change
+```
+
+Use an unused branch name and worktree directory. The `&&` chain prevents worktree creation if any preceding command fails, including the commit-ID equality check. Stop and investigate if the update cannot fast-forward or local `main` differs from freshly fetched `origin/main`; preserve unexpected local commits. The repository-local `push.default=nothing` safeguard rejects implicit pushes; it does not replace verification of the exact destination repository, visibility, branch and refspec before any explicit push. No global Git policy is required.
+
+Implement a focused change and test locally using the relevant guidance below, preserving shared upstream ancestry. A focused branch from current `main` is sufficient for ordinary contributions; use a separate worktree where appropriate. Review the complete diff and testing evidence before publication. Experimental branches, commits and uncommitted work may remain local indefinitely and are not automatically published. Publish or open a PR only after establishing the intended destination and authorization to publish there.
+
+Our Codex workflow always uses isolated local worktrees and MANAGE-controlled publication. MANAGE reviews implementation and testing evidence; functional acceptance does not authorize a push or PR. Publication requires a separate explicit decision and destination verification. External contributors use ordinary GitHub review and their own repository permissions; they do not need our internal MANAGE process. Existing [Balanced CI](#public-ci-validation) validates eligible published changes and does not replace local testing or review.
+
 ## Building
 
 The project uses CMake and C++17. The checked-in presets use schema version 6 and need **CMake 3.25 or later** (the older project minimum does not describe preset compatibility). Native builds fetch pinned dependencies by default; Git and network access are needed for a fresh dependency checkout. Never commit build trees, game files or signing material.

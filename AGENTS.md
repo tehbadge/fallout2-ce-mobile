@@ -19,9 +19,15 @@
 ## Repository identity and publication safety
 
 - Original public upstream: `imbaner/fallout2-ce-mobile`. Downstream contributors must distinguish their own development repositories from upstream and independently verify repository identity and visibility. Names and documented roles are not authorization to publish.
-- Before pushing, independently verify the actual destination URL, repository visibility, intended branch/ref, and safety for the remote's current state. Never infer publication eligibility from a remote name, including `origin` or `backup`.
+- Before pushing, independently verify the actual destination URL, repository visibility, intended branch/ref and exact refspec, and safety for the remote's current state. Never infer publication eligibility from a remote name, including `origin` or `backup`.
 - Never use public upstream for routine development backups. Publishing there requires explicit authorization identifying that destination. A development backup also requires authorization and verification of its intended repository and visibility; a remote named `backup` is not permission to push.
 - Do not force-push, rewrite remotes, or redirect publication to another repository without explicit authorization. Stop and report unexpected destinations or repository state instead of silently repairing them.
+
+### Canonical local development
+
+- Canonical accepted source: `tehbadge/fallout2-ce-mobile`, branch `main`. The private `tehbadge/fallout2-ce-mobile-ios` repository and its `ios-port` branch are preserved historical references, not routine development baselines.
+- Start new development from freshly verified public `main`, using focused local branches and isolated worktrees. Experiments may remain entirely local indefinitely; unfinished branches and commits do not need publication.
+- MANAGE reviews implementation and testing evidence before accepting changes. Functional acceptance does not authorize pushing or publication; publication requires a separate explicit authorization for the exact repository, branch, refspec and destination, with the verification above and appropriate validation.
 
 ## Validation and reporting
 
