@@ -2475,12 +2475,21 @@ static const DevAutotestStep kDevAutotestReportManualSteps[] = {
     { DEV_AUTOTEST_ACTION_MUI_DRAG_BY, 0, -0.5f, 0, 40, "m09_scrolled", "prefs.about" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 40, "m10_report", "prefs.about.issues" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m11_window", "report.github" },
+#ifdef __IPHONEOS__
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "m12_no_form", "report.form" },
+    { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 0, 0, 0, 1, "m12_no_telegram", "report.telegram" },
+#else
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m12_form", "report.form" },
+#endif
     { DEV_AUTOTEST_ACTION_CHECK_REPORT, 0, 0, 0, 1, "m13_report", "Code: manual", "- saved to slot 1" },
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m14_copy", "report.copy" },
+#ifndef __IPHONEOS__
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m14_form", "report.form" },
+#endif
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m15_github", "report.github" },
+#ifndef __IPHONEOS__
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 10, "m16_telegram", "report.telegram" },
+#endif
     { DEV_AUTOTEST_ACTION_MUI_TAP, 0, 0, 0, 60, "m17_saves", "report.saves" },
     { DEV_AUTOTEST_ACTION_CHECK_WIDGET, 1, 0, 0, 1, "m18_back_after_saves", "report.github" },
     { DEV_AUTOTEST_ACTION_BACK, 0, 0, 0, 40, "m19_closed" },
@@ -5185,7 +5194,13 @@ void devAutotestTick()
             }
             // Only the report's own lines: what happened first, then the
             // fixed ones.
-            static const char* const kLines[] = { "Code: ", "F2 Touch ", "Script: ", "Last events:", "- " };
+            static const char* const kLines[] = { "Code: ",
+#ifdef __IPHONEOS__
+                "Fallout 2 CE Mobile (tehbadge; based on imbaner) ",
+#else
+                "F2 Touch ",
+#endif
+                "Script: ", "Last events:", "- " };
             size_t start = 0;
             for (int index = 0; start < text.size(); index++) {
                 size_t end = text.find('\n', start);
