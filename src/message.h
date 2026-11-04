@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "db.h"
 #include "proto_types.h"
 
 namespace fallout {
@@ -17,7 +18,7 @@ namespace fallout {
 // (who should check game mode before accessing volatile message lists). CE
 // always exposes persistent standard message lists and additionally exposes
 // some volatile lists for the duration of their UI lifetime:
-enum StandardMessageList {
+enum StandardMessageList : int {
     STANDARD_MESSAGE_LIST_COMBAT,
     STANDARD_MESSAGE_LIST_COMBAT_AI,
     STANDARD_MESSAGE_LIST_SCRNAME,
@@ -42,7 +43,7 @@ enum StandardMessageList {
     STANDARD_MESSAGE_LIST_COUNT,
 };
 
-enum {
+enum ProtoMessageList : int {
     PROTO_MESSAGE_LIST_ITEMS,
     PROTO_MESSAGE_LIST_CRITTERS,
     PROTO_MESSAGE_LIST_SCENERY,
@@ -71,6 +72,8 @@ bool messageListFree(MessageList* msg);
 bool messageListLoad(MessageList* msg, const char* path);
 // CE: From [language]'s folder in `text`, not the game's.
 bool messageListLoadInLanguage(MessageList* msg, const char* path, const char* language);
+// CE: The messages of an open [stream] (closed after), [name] for the errors.
+bool messageListLoadFromFile(MessageList* msg, File* stream, const char* name);
 bool messageListGetItem(MessageList* msg, MessageListItem* entry);
 bool _message_make_path(char* dest, size_t size, const char* path);
 char* getmsg(MessageList* msg, MessageListItem* entry, int num);

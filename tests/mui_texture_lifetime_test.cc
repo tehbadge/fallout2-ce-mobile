@@ -71,6 +71,14 @@ unsigned char palette[768] {};
 namespace fallout {
 unsigned char* directDrawGetPalette() { return palette; }
 void muiIconsReset() {}
+static unsigned int artGeneration = 1;
+static unsigned char artPixel = 1;
+unsigned int artCacheGeneration() { return artGeneration; }
+Art* artLock(const FrmId&, CacheEntry** entry) { *entry = nullptr; return reinterpret_cast<Art*>(1); }
+int artUnlock(CacheEntry*) { return 0; }
+int artGetWidth(Art*, int, Rotation) { return 1; }
+int artGetHeight(Art*, int, Rotation) { return 1; }
+unsigned char* artGetFrameData(Art*, int, Rotation) { return &artPixel; }
 }
 using namespace fallout;
 
@@ -181,6 +189,22 @@ int main()
     palette[3] = 10;
     palette[6] = 20;
     begin();
+    // Art changes under the same fid after a flush (Hero Appearance).
+    int artWidth, artHeight;
+    const FrmId artId(0);
+    auto* artTexture = muiArtTexture(artId, 0, &artWidth, &artHeight, 0);
+    assert(artTexture && artWidth == 1 && artHeight == 1);
+    int beforeArt = uploads;
+    assert(muiArtTexture(artId, 0, &artWidth, &artHeight, 0) == artTexture && uploads == beforeArt);
+    ++artGeneration;
+    artPixel = 2;
+    assert(muiArtTexture(artId, 0, &artWidth, &artHeight, 0) == artTexture && uploads == beforeArt + 1);
+    assert(red(artTexture) == 80);
+    ++artGeneration;
+    failUpload = true;
+    assert(!muiArtTexture(artId, 0, &artWidth, &artHeight, 0));
+    failUpload = false;
+    assert(muiArtTexture(artId, 0, &artWidth, &artHeight, 0));
     uploadFailures(false);
     uploadFailures(true);
     // Fixed production keys: reopening must upload even when version and

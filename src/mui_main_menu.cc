@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <string>
 
+#include "app_update.h"
 #include "art.h"
 #include "fps_limiter.h"
 #include "game.h"
@@ -14,10 +15,13 @@
 #include "mainmenu.h"
 #include "message.h"
 #include "mui_draw.h"
+#include "mui_update.h"
 #include "platform_compat.h"
 #include "settings.h"
 #include "svga.h"
 #include "version.h"
+
+#include <SDL.h>
 
 namespace fallout {
 
@@ -58,14 +62,15 @@ namespace {
         void back() override
         {
 #ifndef __IPHONEOS__
-            choice = MAIN_MENU_EXIT;
+            choice = MainMenuOption::Exit;
 #endif
         }
 
-        int choice = -1;
+        MainMenuOption choice = MainMenuOption::Invalid;
         // Going away in windows (`muiMainMenuLeave`): the buttons fade out
         // over the picture.
         unsigned int leaveTime = 0;
+        bool pendingUpdate = false;
 
     private:
         // The save Continue loads, -1 - none (or the button is off).
@@ -76,6 +81,7 @@ namespace {
 
         void buildButtons(MuiContext& ui, const MuiRect& column);
         void buildFooter(MuiContext& ui, const MuiRect& rect);
+        void buildLinks(MuiContext& ui, const MuiRect& safe);
     };
 
     MainMenuScreen::MainMenuScreen()
@@ -126,6 +132,7 @@ namespace {
         float layer = muiLayerAlpha();
         muiSetLayerAlpha(alpha);
         buildButtons(ui, column);
+        buildLinks(ui, safe);
         muiSetLayerAlpha(layer);
     }
 
@@ -139,7 +146,8 @@ namespace {
         float footerHeight = ui.dp(30.0f);
 
         MuiRect viewport = { column.x, column.y, column.w, std::max(column.h - footerHeight, 0.0f) };
-        float buttonCount = hasSaves ? 3.0f : 2.0f;
+        bool update = appUpdateHasRelease();
+        float buttonCount = (hasSaves ? 3.0f : 2.0f) + (update ? 1.0f : 0.0f);
         float fixedHeight = continueHeight + buttonHeight * buttonCount + smallHeight;
         float gapCount = buttonCount + (continueSlot != -1 ? 1.0f : 0.0f);
         float gap = std::clamp((viewport.h - fixedHeight) / gapCount, ui.dp(2.0f), ui.dp(8.0f));
@@ -157,7 +165,7 @@ namespace {
             MuiRect rect = { column.x, y, column.w, continueHeight };
             bool pressed = false;
             if (buttonsUi.touchable("mainmenu.continue", rect, &pressed)) {
-                choice = MAIN_MENU_CONTINUE;
+                choice = MainMenuOption::Continue;
             }
             muiFillRoundRect(rect, ui.dp(theme.radius), pressed ? theme.buttonPressed : theme.buttonPrimary);
             MuiColor text = pressed ? theme.buttonText : theme.buttonPrimaryText;
@@ -175,15 +183,15 @@ namespace {
             const char* id;
             int textId;
             const char* fallback;
-            int choice;
+            MainMenuOption choice;
         };
         const Button buttons[] = {
-            { "mainmenu.new", kTextNewGame, "New game", MAIN_MENU_NEW_GAME },
-            { "mainmenu.load", kTextLoadGame, "Load game", MAIN_MENU_LOAD_GAME },
-            { "mainmenu.settings", kTextSettings, "Settings", MAIN_MENU_OPTIONS },
+            { "mainmenu.new", kTextNewGame, "New game", MainMenuOption::NewGame },
+            { "mainmenu.load", kTextLoadGame, "Load game", MainMenuOption::LoadGame },
+            { "mainmenu.settings", kTextSettings, "Settings", MainMenuOption::Options },
         };
         for (const Button& button : buttons) {
-            if (button.choice == MAIN_MENU_LOAD_GAME && !hasSaves) {
+            if (button.choice == MainMenuOption::LoadGame && !hasSaves) {
                 continue;
             }
             if (buttonsUi.button(button.id, { column.x, y, column.w, buttonHeight }, muiDecodeGameText(muiText(button.textId, button.fallback)))) {
@@ -192,13 +200,22 @@ namespace {
             y += buttonHeight + gap;
         }
 
+        if (update) {
+            std::u32string label = muiDecodeGameText(muiText(appUpdateReady() ? 406 : appUpdateState() == AppUpdateState::Downloading ? 409
+                                                                                                                                      : 405,
+                appUpdateReady() ? "Update ready" : appUpdateState() == AppUpdateState::Downloading ? "Downloading update…"
+                                                                                                    : "Update available"));
+            if (buttonsUi.button("mainmenu.update", { column.x, y, column.w, buttonHeight }, label, MuiButtonStyle::AccentBorder)) pendingUpdate = true;
+            y += buttonHeight + gap;
+        }
+
         // Seldom used ones in a row.
         const Button small[] = {
-            { "mainmenu.intro", kTextIntro, "Intro", MAIN_MENU_INTRO },
-            { "mainmenu.credits", kTextCredits, "Credits", MAIN_MENU_CREDITS },
+            { "mainmenu.intro", kTextIntro, "Intro", MainMenuOption::Intro },
+            { "mainmenu.credits", kTextCredits, "Credits", MainMenuOption::Credits },
 #ifndef __IPHONEOS__
             // Returning from SDL_main leaves the UIKit application alive.
-            { "mainmenu.exit", kTextExit, "Exit", MAIN_MENU_EXIT },
+            { "mainmenu.exit", kTextExit, "Exit", MainMenuOption::Exit },
 #endif
         };
         constexpr int smallCount = sizeof(small) / sizeof(small[0]);
@@ -214,11 +231,47 @@ namespace {
         buildFooter(ui, { column.x, column.bottom() - footerHeight, column.w * 2.0f, footerHeight });
     }
 
+    // The port author's pages at the top right, over the picture: small, as
+    // HUD buttons are, and open in the browser.
+    void MainMenuScreen::buildLinks(MuiContext& ui, const MuiRect& safe)
+    {
+        const MuiTheme& theme = muiTheme();
+        struct Link {
+            const char* id;
+            MuiIcon icon;
+            const char* url;
+        };
+        const Link links[] = {
+            { "mainmenu.telegram", MuiIcon::Telegram, kPortTelegramUrl },
+            { "mainmenu.youtube", MuiIcon::YouTube, kPortYouTubeUrl },
+            { "mainmenu.github", MuiIcon::GitHub, kPortSourceUrl },
+        };
+        float size = ui.dp(38.0f);
+        float gap = ui.dp(8.0f);
+        float margin = ui.dp(16.0f);
+        float x = safe.right() - margin - size * 3.0f - gap * 2.0f;
+        for (const Link& link : links) {
+            MuiRect rect = { x, safe.y + margin, size, size };
+            bool pressed;
+            if (ui.touchable(link.id, rect, &pressed)) SDL_OpenURL(link.url);
+            muiFillRoundRect(rect, size / 2.0f, pressed ? theme.buttonPressed : theme.button);
+            muiStrokeRoundRect(rect, size / 2.0f, ui.dp(1.0f), pressed ? theme.accent : theme.buttonBorder);
+            muiDrawIcon(link.icon, rect.centerX(), rect.centerY(), size * 0.5f, theme.accent);
+            x += size + gap;
+        }
+        // Whose pages they are: the port's author, not Fallout's.
+        float right = safe.right() - margin;
+        MuiRect caption = { right - size * 3.0f - gap * 2.0f - ui.dp(60.0f), safe.y + margin + size + ui.dp(4.0f), size * 3.0f + gap * 2.0f + ui.dp(60.0f), ui.dp(16.0f) };
+        muiDrawTextAligned(muiDecodeGameText(muiText(463, "Port by imbaner")), caption, ui.dp(11.0f), theme.textDim, MuiAlign::End, MuiAlign::Center);
+    }
+
     // The game's copyright and version, as its menu shows them.
     void MainMenuScreen::buildFooter(MuiContext& ui, const MuiRect& rect)
     {
         const MuiTheme& theme = muiTheme();
-        char version[VERSION_MAX];
+        // Longer than the game's VERSION_MAX: a mod's own version string
+        // ("FALLOUT: NEVADA (EXPANSION VERSION)") whole.
+        char version[128];
         versionGetVersion(version, sizeof(version));
 
         std::u32string text;
@@ -278,6 +331,7 @@ void muiMainMenuShow()
 
     gMainMenuScreen = new MainMenuScreen();
     muiPush(gMainMenuScreen);
+    if (settings.touch.update_check) appUpdateCheck(false);
 }
 
 void muiMainMenuLeave()
@@ -306,14 +360,19 @@ void muiMainMenuHide()
     gMainMenuScreen = nullptr;
 }
 
-int muiMainMenuTakeChoice()
+MainMenuOption muiMainMenuTakeChoice()
 {
     if (gMainMenuScreen == nullptr) {
-        return -1;
+        return MainMenuOption::Invalid;
     }
 
-    int choice = gMainMenuScreen->choice;
-    gMainMenuScreen->choice = -1;
+    if (gMainMenuScreen->pendingUpdate) {
+        gMainMenuScreen->pendingUpdate = false;
+        muiUpdateShow();
+    }
+
+    MainMenuOption choice = gMainMenuScreen->choice;
+    gMainMenuScreen->choice = MainMenuOption::Invalid;
     return choice;
 }
 

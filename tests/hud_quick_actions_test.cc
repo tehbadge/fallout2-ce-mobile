@@ -74,8 +74,8 @@ void muiRemove(MuiScreen* screen) { assert(active == screen); active = nullptr; 
 bool interfaceBarEnabled() { return interfaceEnabled; }
 bool touchHudConfirmQuickLoad() { assert(!active); confirms++; return interfaceEnabled && confirm; }
 void gameCommandPost(GameCommandType type, int) { assert(!active); posts++; posted = type; }
-int lsgSaveGame(int mode) { assert(mode == LOAD_SAVE_MODE_NORMAL); saves++; return 1; }
-int lsgLoadGame(int mode) { assert(mode == LOAD_SAVE_MODE_NORMAL); loads++; return 1; }
+int lsgSaveGame(LoadSaveMode mode) { assert(mode == LoadSaveMode::Normal); saves++; return 1; }
+int lsgLoadGame(LoadSaveMode mode) { assert(mode == LoadSaveMode::Normal); loads++; return 1; }
 int doPreferences(bool) { return 0; }
 int showQuitConfirmationDialog() { return 0; }
 int inputGetInput()

@@ -67,6 +67,20 @@ int main()
 {
     restart();
     assert(!settings.touch.game_menu_quick_actions);
+    assert(settings.enhancements.highlight_containers && settings.enhancements.highlight_corpses);
+    assert(!settings.enhancements.highlight_hidden_items);
+    for (bool enabled : {true, false}) {
+        settings.enhancements.highlight_containers = enabled;
+        settings.enhancements.highlight_corpses = enabled;
+        settings.enhancements.highlight_hidden_items = enabled;
+        assert(settingsSave());
+        restart();
+        assert(settings.enhancements.highlight_containers == enabled);
+        assert(settings.enhancements.highlight_corpses == enabled);
+        assert(settings.enhancements.highlight_hidden_items == enabled);
+    }
+    disk.clear();
+    restart();
     const auto& descriptors = settingsGetDescriptors();
     auto it = std::find_if(descriptors.begin(), descriptors.end(), [](const SettingDescriptor& d) {
         return d.id == "touch.game_menu_quick_actions";

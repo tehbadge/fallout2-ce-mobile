@@ -9,6 +9,7 @@
 
 #include "db.h"
 #include "debug.h"
+#include "error_report.h"
 #include "export.h"
 #include "input.h"
 #include "interpreter_lib.h"
@@ -275,22 +276,26 @@ static void programPrintError(const char* format, va_list args)
     }
 }
 
+// Stops the current script (back to `_interpret`'s `setjmp`). Without one
+// (a program being loaded, `programCreateByPath`) it returns, as in the
+// original, so it's not `[[noreturn]]`.
+//
 // 0x4671F0
-[[noreturn]] void programFatalError(const char* format, ...)
+void programFatalError(const char* format, ...)
 {
     va_list argptr;
     va_start(argptr, format);
     programPrintError(format, argptr);
     va_end(argptr);
 
+    // CE: Kept for a problem report (error_report.h).
+    va_start(argptr, format);
+    errorReportScriptError(gInterpreterCurrentProgram != nullptr ? gInterpreterCurrentProgram->name : nullptr, format, argptr);
+    va_end(argptr);
+
     if (gInterpreterCurrentProgram) {
         longjmp(gInterpreterCurrentProgram->env, 1);
     }
-#ifdef _MSC_VER
-    __assume(0);
-#else
-    __builtin_unreachable();
-#endif
 }
 
 void programPrintError(const char* format, ...)

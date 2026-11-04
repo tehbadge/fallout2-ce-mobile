@@ -13,6 +13,14 @@
 
 namespace fallout {
 Settings settings;
+bool appUpdateHasRelease() { return false; }
+bool appUpdateReady() { return false; }
+AppUpdateState appUpdateState() { return AppUpdateState::Unsupported; }
+void appUpdateCheck(bool) {}
+void muiUpdateShow() {}
+void errorReportShowPending() {}
+void muiDrawIcon(MuiIcon, float, float, float, MuiColor) {}
+void muiStrokeRoundRect(const MuiRect&, float, float, MuiColor) {}
 const char* gGameMsgPath = "";
 MessageList gMiscMessageList;
 static std::unordered_map<std::string, MuiRect> rects;
@@ -120,12 +128,16 @@ static void checkGating(MainMenuScreen& menu, MuiContext& ui, float x, float y, 
     px = x;
     py = y;
     ui.isInteractive = interactive;
-    menu.choice = -1;
+    menu.choice = MainMenuOption::Invalid;
     menu.build(ui);
     bool expected = interactive && view.contains(x, y);
-    for (const auto& button : enabled) assert(button.second == expected);
+    for (const auto& button : enabled) {
+        // Attribution links are independently interactive above the title art.
+        if (button.first == "mainmenu.github" || button.first == "mainmenu.telegram" || button.first == "mainmenu.youtube") continue;
+        assert(button.second == expected);
+    }
     assert(ui.isInteractive == interactive);
-    if (!expected) assert(menu.choice == -1);
+    if (!expected) assert(menu.choice == MainMenuOption::Invalid);
 }
 
 int main()
@@ -142,13 +154,13 @@ int main()
     for (int key : {KEY_ESCAPE, KEY_LOWERCASE_E, KEY_UPPERCASE_E}) {
         keys = {key, KEY_LOWERCASE_N};
         nextKey = 0;
-        assert(mainMenuWindowHandleEvents() == (hasExit ? MAIN_MENU_EXIT : MAIN_MENU_NEW_GAME));
+        assert(mainMenuWindowHandleEvents() == (hasExit ? MainMenuOption::Exit : MainMenuOption::NewGame));
         assert(nextKey == (hasExit ? 1 : 2));
     }
     requestBack = true;
     keys = {-1, KEY_LOWERCASE_N};
     nextKey = 0;
-    assert(mainMenuWindowHandleEvents() == (hasExit ? MAIN_MENU_EXIT : MAIN_MENU_NEW_GAME));
+    assert(mainMenuWindowHandleEvents() == (hasExit ? MainMenuOption::Exit : MainMenuOption::NewGame));
 
     // signal_close_game sets these two independent requests. On iOS only
     // its return-to-title signal survives; it is consumed without a stale exit.
@@ -156,17 +168,17 @@ int main()
     _game_user_wants_to_quit = GAME_QUIT_REQUEST_MAIN_MENU;
     keys = {-1, KEY_LOWERCASE_N};
     nextKey = 0;
-    assert(mainMenuWindowHandleEvents() == (hasExit ? MAIN_MENU_EXIT : MAIN_MENU_NEW_GAME));
+    assert(mainMenuWindowHandleEvents() == (hasExit ? MainMenuOption::Exit : MainMenuOption::NewGame));
     assert(_game_user_wants_to_quit == (hasExit ? GAME_QUIT_REQUEST_EXIT : GAME_QUIT_REQUEST_NONE));
     _game_user_wants_to_quit = GAME_QUIT_REQUEST_NONE;
     keys = {KEY_LOWERCASE_N};
     nextKey = 0;
-    assert(mainMenuWindowHandleEvents() == MAIN_MENU_NEW_GAME);
+    assert(mainMenuWindowHandleEvents() == MainMenuOption::NewGame);
     // Explicit engine shutdown requests remain distinct from title shortcuts.
     _game_user_wants_to_quit = GAME_QUIT_REQUEST_EXIT;
     keys = {-1};
     nextKey = 0;
-    assert(mainMenuWindowHandleEvents() == MAIN_MENU_EXIT);
+    assert(mainMenuWindowHandleEvents() == MainMenuOption::Exit);
     _game_user_wants_to_quit = GAME_QUIT_REQUEST_NONE;
     muiMainMenuHide();
 
@@ -190,7 +202,7 @@ int main()
                     enabled.clear();
                     requestedOffset = bottom ? 100000.0f : 0;
                     checkGating(menu, ui, ui.safe.x, ui.safe.y, true);
-                    assert(rects.size() == 4 + (hasSaves ? 1 : 0) + (hasContinue ? 1 : 0) + (hasExit ? 1 : 0));
+                    assert(rects.size() == 3 + 4 + (hasSaves ? 1 : 0) + (hasContinue ? 1 : 0) + (hasExit ? 1 : 0));
                     assert(rects.count("mainmenu.exit") == (hasExit ? 1 : 0));
                     assert(rects.count("mainmenu.load") == (hasSaves ? 1 : 0));
                     for (const char* id : {"mainmenu.new", "mainmenu.load", "mainmenu.settings"}) {
@@ -222,7 +234,7 @@ int main()
                         scrollRange = std::max(content - view.h, 0.0f);
                         if (view.contains(first.centerX(), first.centerY())) {
                             checkGating(menu, ui, first.centerX(), first.centerY(), true);
-                            assert(menu.choice == (hasContinue ? MAIN_MENU_CONTINUE : MAIN_MENU_NEW_GAME));
+                            assert(menu.choice == (hasContinue ? MainMenuOption::Continue : MainMenuOption::NewGame));
                         }
                     }
                     // A roomy layout preserves the original centered bounds.
@@ -245,20 +257,20 @@ int main()
                         const MuiRect settingsButton = rects.at("mainmenu.settings");
                         if (view.contains(settingsButton.centerX(), settingsButton.centerY())) {
                             checkGating(menu, ui, settingsButton.centerX(), settingsButton.centerY(), true);
-                            assert(menu.choice == MAIN_MENU_OPTIONS);
+                            assert(menu.choice == MainMenuOption::Options);
                         }
                         MuiRect last = rects.at(lastButton);
                         checkGating(menu, ui, last.centerX(), last.centerY(), true);
-                        assert(menu.choice == (hasExit ? MAIN_MENU_EXIT : MAIN_MENU_CREDITS));
+                        assert(menu.choice == (hasExit ? MainMenuOption::Exit : MainMenuOption::Credits));
                         // The former Exit area belongs to Credits on iOS,
                         // with no hidden Exit input left behind.
                         float oldWidth = (view.w - ui.dp(16)) / 3;
                         checkGating(menu, ui, view.right() - oldWidth / 2, last.centerY(), true);
-                        assert(menu.choice == (hasExit ? MAIN_MENU_EXIT : MAIN_MENU_CREDITS));
+                        assert(menu.choice == (hasExit ? MainMenuOption::Exit : MainMenuOption::Credits));
                     } else if (rects.at(lastButton).centerY() >= view.bottom()) {
                         MuiRect last = rects.at(lastButton);
                         checkGating(menu, ui, last.centerX(), last.centerY(), true);
-                        assert(menu.choice == -1);
+                        assert(menu.choice == MainMenuOption::Invalid);
                     }
                 }
             }

@@ -1,5 +1,14 @@
 # iOS port status
 
+## Upstream Checkpoint A — local candidate (2026-11-03)
+
+Local branch `codex/upstream-checkpoint-a` merges verified public downstream `a919da9c` with frozen latest upstream `577c6d96` (168 incoming commits, including all seven beyond assessed `b0460ece`). Nine textual conflicts resolved; canonical main and historical private development remain unchanged. This candidate awaits MANAGE review; it is not a new accepted runtime baseline.
+
+- **Automated verification:** 18/18 assertion-enabled host regressions pass; 2,328 script writer and 608 legacy-reader cases; native map/HUD ownership and engine-wait/script-lock tests; strengthened save relocation, highlighting/settings rollback/persistence, art generation/F2 texture tests. Texture harness passes ASan+UBSan. Desktop engine/resource tool, nonempty `ce.dat`, unsigned iPhoneOS Debug, arm64 simulator Debug and CPack pass on Xcode 27.1. Both SDL patches verified; minimum iOS 15.0 and app identity preserved. No Java/Android toolchain available locally.
+- **Policies:** iOS highlighting defaults On/On/Off, mod-gated Hero Appearance, existing iOS geometry/Exit suppression/quick actions/session-only CRT retained. iOS reports use downstream Issues and do not infer crashes from interrupted-session markers. Downstream Android builds cannot select upstream release updates by inherited package ID alone. Balanced CI is unchanged; disabled workflows remain disabled.
+- **Boundary:** local merge/verification only; no signing, install, simulator gameplay, physical-device work, publication or main promotion. Checkpoint B needs separate authorization and runtime acceptance. See [full Checkpoint A report](UPSTREAM-CHECKPOINT-A.md) for target assessment, conflict resolutions, exact commands, evidence limits and outstanding work.
+
+
 ## Current accepted state (2026-10-28)
 
 This summary supersedes candidate-era review/promotion statements below. It describes the accepted technical baseline and completed public-source publication. Except for explicitly identified public commits, public CI evidence and upstream references, downstream commit hashes, branch names, local evidence paths and CI runs below refer to historical private development. Those private commits are not ancestors of public main; private CI runs and artifacts require private access and are not public downloads.

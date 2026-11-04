@@ -24,6 +24,7 @@
 #include "display_monitor.h"
 #include "draw.h"
 #include "endgame.h"
+#include "error_report.h"
 #include "font_manager.h"
 #include "game.h"
 #include "game_charset.h"
@@ -33,6 +34,7 @@
 #include "game_mouse.h"
 #include "game_movie.h"
 #include "game_sound.h"
+#include "hero_appearance.h"
 #include "input.h"
 #include "interface.h"
 #include "inventory.h"
@@ -81,6 +83,7 @@
 #include "trait.h"
 #include "version.h"
 #include "win32.h"
+#include "window.h"
 #include "window_manager.h"
 #include "world_view.h"
 #include "worldmap.h"
@@ -116,6 +119,9 @@ static char _aBuildHash[] = _BUILD_HASH;
 // 0x5186B4 game_ui_disabled
 static bool gGameUiDisabled = false;
 
+// CE: See `gameUiDisableByScript`.
+static bool gGameUiDisabledByScript = false;
+
 // 0x5186B8 game_state_cur
 static GameState gGameState = GameState::Normal;
 
@@ -149,7 +155,7 @@ bool gGameLoaded = false;
 static void** gGameGlobalPointers = nullptr;
 
 // 0x442580
-int gameInitWithOptions(const char* windowTitle, bool isMapper, int font, int flags, int argc, char** argv)
+int gameInitWithOptions(const char* windowTitle, bool isMapper, int font, WindowManagerInitFlags flags, int argc, char** argv)
 {
     char path[COMPAT_MAX_PATH];
 
@@ -282,6 +288,9 @@ int gameInitWithOptions(const char* windowTitle, bool isMapper, int font, int fl
     }
 
     debugPrint(">moviefx_init\t");
+
+    // SFALL: Hero Appearance's setting, before the art (`artInit`).
+    heroAppearanceInit();
 
     if (isoInit() != 0) {
         debugPrint("Failed on iso_init\n");
@@ -505,6 +514,7 @@ void gameExit()
     debugPrint("\nGame Exit\n");
 
     touchLogExit();
+    errorReportExit();
     actionLog("the game closed");
     actionLogFlush();
 
@@ -536,6 +546,7 @@ void gameExit()
     protoExit();
     gameMouseExit();
     isoExit();
+    heroAppearanceExit();
     movieEffectsExit();
     movieExit();
     gameSoundExit();
@@ -578,7 +589,7 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
     }
 #else
     if (eventCode == -1) {
-        if ((mouseGetEvent() & MOUSE_EVENT_WHEEL) != 0) {
+        if ((mouseGetEvent() & MouseButtonEvent::Wheel) != MouseButtonEvent::None) {
             int wheelX;
             int wheelY;
             mouseGetWheel(&wheelX, &wheelY);
@@ -614,13 +625,13 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
     }
 
     if (eventCode == -2) {
-        int mouseState = mouseGetEvent();
+        MouseButtonEvent mouseEvent = mouseGetEvent();
         int mouseX;
         int mouseY;
         mouseGetPosition(&mouseX, &mouseY);
 
-        if ((mouseState & MOUSE_EVENT_LEFT_BUTTON_DOWN) != 0) {
-            if ((mouseState & MOUSE_EVENT_LEFT_BUTTON_REPEAT) == 0) {
+        if ((mouseEvent & MouseButtonEvent::LeftButtonDown) != MouseButtonEvent::None) {
+            if ((mouseEvent & MouseButtonEvent::LeftButtonRepeat) == MouseButtonEvent::None) {
                 if (mouseX == _scr_size.left || mouseX == _scr_size.right
                     || mouseY == _scr_size.top || mouseY == _scr_size.bottom) {
                     _gmouse_clicked_on_edge = true;
@@ -629,7 +640,7 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
                 }
             }
         } else {
-            if ((mouseState & MOUSE_EVENT_LEFT_BUTTON_UP) != 0) {
+            if ((mouseEvent & MouseButtonEvent::LeftButtonUp) != MouseButtonEvent::None) {
                 _gmouse_clicked_on_edge = false;
             }
         }
@@ -638,7 +649,7 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
         // emulated mouse clicks (e.g. finger lifted after pressing a button
         // which closed a window) must not act on the map.
         if (!touchControlsIsEnabled()) {
-            _gmouse_handle_event(mouseX, mouseY, mouseState);
+            _gmouse_handle_event(mouseX, mouseY, mouseEvent);
         }
         return 0;
     }
@@ -655,13 +666,13 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
 #if !FALLOUT_TOUCH_ONLY
     case -2:
         if (1) {
-            int mouseEvent = mouseGetEvent();
+            MouseButtonEvent mouseEvent = mouseGetEvent();
             int mouseX;
             int mouseY;
             mouseGetPosition(&mouseX, &mouseY);
 
-            if ((mouseEvent & MOUSE_EVENT_LEFT_BUTTON_DOWN) != 0) {
-                if ((mouseEvent & MOUSE_EVENT_LEFT_BUTTON_REPEAT) == 0) {
+            if ((mouseEvent & MouseButtonEvent::LeftButtonDown) != MouseButtonEvent::None) {
+                if ((mouseEvent & MouseButtonEvent::LeftButtonRepeat) == MouseButtonEvent::None) {
                     if (mouseX == _scr_size.left || mouseX == _scr_size.right
                         || mouseY == _scr_size.top || mouseY == _scr_size.bottom) {
                         _gmouse_clicked_on_edge = true;
@@ -670,7 +681,7 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
                     }
                 }
             } else {
-                if ((mouseEvent & MOUSE_EVENT_LEFT_BUTTON_UP) != 0) {
+                if ((mouseEvent & MouseButtonEvent::LeftButtonUp) != MouseButtonEvent::None) {
                     _gmouse_clicked_on_edge = false;
                 }
             }
@@ -904,14 +915,14 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
     case KEY_CTRL_S:
     case KEY_F4:
         soundPlayFile("ib1p1xx1");
-        if (lsgSaveGame(1) == -1) {
+        if (lsgSaveGame(LoadSaveMode::Normal) == -1) {
             debugPrint("\n ** Error calling SaveGame()! **\n");
         }
         break;
     case KEY_CTRL_L:
     case KEY_F5:
         soundPlayFile("ib1p1xx1");
-        if (lsgLoadGame(LOAD_SAVE_MODE_NORMAL) == -1) {
+        if (lsgLoadGame(LoadSaveMode::Normal) == -1) {
             debugPrint("\n ** Error calling LoadGame()! **\n");
         }
         break;
@@ -967,6 +978,8 @@ void gameUiDisable(int allowScrolling)
 // 0x443C30
 void gameUiEnable()
 {
+    gGameUiDisabledByScript = false;
+
     if (gGameUiDisabled) {
         interfaceBarEnable();
         keyboardEnable();
@@ -982,6 +995,17 @@ void gameUiEnable()
 bool gameUiIsDisabled()
 {
     return gGameUiDisabled;
+}
+
+void gameUiDisableByScript()
+{
+    gameUiDisable(0);
+    gGameUiDisabledByScript = true;
+}
+
+bool gameUiIsDisabledByScript()
+{
+    return gGameUiDisabledByScript;
 }
 
 // 0x443C68
@@ -1265,7 +1289,7 @@ void showHelp()
                     sharedFpsLimiter.throttle();
                 }
 
-                while (mouseGetEvent() != 0) {
+                while (mouseGetEvent() != MouseButtonEvent::None) {
                     sharedFpsLimiter.mark();
 
                     inputGetInput();

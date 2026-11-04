@@ -10,22 +10,22 @@ This repository is the published unofficial downstream source fork, [tehbadge/fa
 
 This is an **unofficial, fan-made, modified version** of Fallout 2 CE. It is not affiliated with or endorsed by Bethesda Softworks, ZeniMax Media or Interplay. Fallout is a trademark of its owners. Original Fallout 2 installation archives, music and videos are not supplied. The project includes additional interface resources, fonts and scripts; see [License and attribution](#license-and-attribution). You need a legally acquired copy of Fallout 2 ([GOG](https://www.gog.com/game/fallout_2), [Steam](https://store.steampowered.com/app/38410), [Epic Games](https://store.epicgames.com/p/fallout-2)).
 
-## Screenshots
+## In play
 
-<p><img src="docs/screenshots/combat.jpg" alt="Combat: an enemy picked, its hit chance" width="49%"> <img src="docs/screenshots/dialogue.jpg" alt="Dialogue: the drill sergeant at Navarro" width="49%"></p>
-
-<p><img src="docs/screenshots/inventory.jpg" alt="Inventory: an item's action menu" width="49%"> <img src="docs/screenshots/character.jpg" alt="Character" width="49%"></p>
+<p align="center"><img src="docs/screenshots/touch-play.gif" alt="Tap to run, a long press for Lockpick, drag to wear and to trade, a rocket at deathclaws: no cursor" width="720"></p>
 
 ## What is changed (modified software notice)
 
 The inherited mobile port provides the following features on top of CE; its engine, fixes and sfall compatibility are retained. The iOS adaptation reuses this work:
 
 - **Touch UI.** The game's screens are replaced with screens made for fingers and the phone's resolution: dialogue, barter, inventory, loot, character and level-up, character creation, Pip-Boy (quests, holodisks with their voice, maps, videos, rest), automap, world map and town maps, skills, game menu, settings, save/load, main menu, dialog boxes, called shots. No cursor: tap to act, long press for the action menu, drag to move items, two fingers to zoom the map.
-- **HUD.** Buttons anchored to the screen's edges (sized in dp), the attack modes with reload, the message log, end turn/combat.
+- **Tablets.** Game screens open as windows over the world, laid out for tablet screens (4:3 too); the UI size follows the screen and is a setting.
+- **HUD.** Buttons anchored to the screen's edges (sized in dp), both hands with their attack modes and AP, reload, start and end combat, end turn, the message log. The highlight button also shows containers and bodies with loot (settings).
 - **Tactical view in combat** (a button, can be turned off in the settings): figures turn see-through, the hexes you can reach and everyone's hex are drawn on the ground, so a tile behind an enemy can be picked and an enemy chosen by its hex.
-- **Mod features built in** where the mods can't run on CE: Inventory Filter's filters and party tabs in loot and barter.
+- **Mod features built in** where the mods can't run on CE: Inventory Filter's filters and party tabs in loot and barter; sfall's Hero Appearance (race and hairstyle, with RPU) as a tab of character creation.
 - **Saves.** A save list sorted by when saves were made, quick saves that never overwrite manual ones (their number is a setting), "Continue" in the main menu, saves interrupted midway are restored, optional marks for saves made with other game files or mods.
-- **Android app.** The game's files are imported from a folder or any archive (.zip, .7z, .rar, .tar...) copied from a computer, with RPU and other mods and the saves; "Replace game" for new builds and mod updates; export and import of saves.
+- **Upstream Android app.** The game's files are imported from a folder or any archive (.zip, .7z, .rar, .tar...) copied from a computer, with RPU and other mods and the saves; "Replace game" for new builds and mod updates; export and import of saves; verified updates from GitHub Releases.
+- **Upstream web app** (iPhone, iPad, Android browsers): the same engine and touch UI in the browser. Installs to the Home Screen, plays offline, keeps the game and saves in the browser's storage, updates from the site.
 - **The port's own improvements** are settings (`[enhancements]` in `fallout2.cfg`).
 - **iPhone and iPad.** Shared touch controls, display density and safe-area handling, both landscape orientations, and phone/tablet layouts. Settings → Display offers **Game screens** and **Screen layouts**, including Auto choices for windows and roomier layouts where they fit.
 - **iOS quick actions.** **Quick Save/Load in Game Menu** moves the HUD quick actions into the Game Menu when enabled; it defaults to Off and is saved with settings. The separate **Quick saves** setting controls automatic quicksave slots; Off uses the save picker.
@@ -69,6 +69,13 @@ Touch controls are shared with the Android mobile interface: tap destinations/ac
 ## Reporting problems
 
 Use [downstream Issues](https://github.com/tehbadge/fallout2-ce-mobile/issues) for native iOS problems, shared mobile UI behavior introduced or changed downstream, additional fixes or CRT bugs, and questions about building and running this source. Include engine commit/build, device and OS, reproduction steps, relevant settings and logs with personal data removed. Provide saves only when needed and share them deliberately; do not upload purchased game archives. Original Android-release issues that reproduce on unchanged upstream should generally use [imbaner’s issue tracker](https://github.com/imbaner/fallout2-ce-mobile/issues).
+
+## Upstream news and support
+
+- [Telegram](https://t.me/imbaner): developer news.
+- [YouTube](https://www.youtube.com/@imbaner_dev): videos and install guides.
+- [Issues](https://github.com/imbaner/fallout2-ce-mobile/issues): original upstream Android/web bugs and requests. Native iOS issues use the downstream tracker above.
+- [Boosty](https://boosty.to/imbaner): an optional thank-you. Everything stays free; a thank-you gives no early builds, features or priority.
 
 ## Building
 
@@ -256,12 +263,10 @@ For this downstream, use [Install on iOS / iPadOS](#install-on-ios--ipados) and 
 
 ### Browser
 
-> **NOTE**: WebAssembly build with emscripten
-```
-docker run --rm -v $(pwd):/src emscripten/emsdk:3.1.74 sh -c 'git config --global --add safe.directory "*" && mkdir -p build && cd build && emcmake cmake ../ -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain/Emscripten.cmake && emmake make'
-```
-- Demo available at https://github.com/ololoken/fallout2-ce-ems.git
-
+The mobile browser target builds with Emscripten 4.0.4. Follow the
+[web build instructions](os/web/README.md) to package the current engine,
+mobile UI and `ce.dat`. It installs your own game from a ZIP, keeps saves in
+the browser and starts offline; players get it at [play.f2touch.com](https://play.f2touch.com).
 
 ## Contributing
 

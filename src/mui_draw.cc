@@ -100,6 +100,8 @@ namespace {
         int width = 0;
         int height = 0;
         unsigned int paletteVersion = 0;
+        // Art textures: `artCacheGeneration` when made.
+        unsigned int artGeneration = 0;
         // The art isn't there (not looked up again).
         bool missing = false;
     };
@@ -1071,7 +1073,7 @@ SDL_Texture* muiArtTexture(const FrmId& frmId, int frame, int* width, int* heigh
 
     auto key = std::make_pair(frmId.fid(), frame * 8 + rotation);
     ArtTexture& entry = gArtTextures[key];
-    if (entry.texture != nullptr && entry.paletteVersion == gPaletteVersion) {
+    if (entry.texture != nullptr && entry.paletteVersion == gPaletteVersion && entry.artGeneration == artCacheGeneration()) {
         *width = entry.width;
         *height = entry.height;
         return entry.texture;
@@ -1097,6 +1099,7 @@ SDL_Texture* muiArtTexture(const FrmId& frmId, int frame, int* width, int* heigh
     if (!uploaded) {
         return nullptr;
     }
+    entry.artGeneration = artCacheGeneration();
 
     *width = artWidth;
     *height = artHeight;

@@ -373,7 +373,9 @@ int main(int argc, char** argv)
         CHECK(range.quickOverflow(10, 5) == 5);
         CHECK(range.setQuickRange(10, 5, &permanent) && permanent == 5);
         // Retention is chronological, not ascending physical slot order:
-        // newest-first processing places J..F in the available quick slots.
+        // oldest-first relocation places F..J in the available quick slots.
+        CHECK(at(10) == snapshot('F') && at(14) == snapshot('J'));
+        CHECK(at(30) == snapshot('A') && at(34) == snapshot('E'));
         CHECK(present() == 20);
         for (size_t index = 0; index < before.size(); index++) {
             const auto& saved = before[index];

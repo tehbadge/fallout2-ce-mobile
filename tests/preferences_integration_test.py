@@ -76,6 +76,22 @@ void muiDrawCostBadge(MuiContext&, const MuiRect&, const std::u32string&, bool) 
 void muiDrawUnavailableOverlay(MuiContext&, const MuiRect&, float) {}
 PipboyUnavailable pipboyUnavailableReason() { return PipboyUnavailable::None; }
 Settings settings;
+static bool persistOk = true;
+static bool scrollLimited = true;
+static int quickCount = 10;
+PreferenceValues preferencesGetValues() { return {}; }
+PreferenceValues preferencesGetDefaults() { return {}; }
+bool preferencesApply(const PreferenceValues&) { return persistOk; }
+int lsgQuickSaveCount() { return quickCount; }
+bool lsgSetQuickSaveCount(int count, bool) { quickCount = count; return true; }
+void settingsWriteToConfig(bool) {}
+Color _colorTable[COLOR_PALETTE_SIZE_15BIT] {};
+void worldViewSetFilter(int) {}
+void tileScrollLimitingEnable() { scrollLimited = true; }
+void tileScrollLimitingDisable() { scrollLimited = false; }
+int soundPlayFile(const char*) { return 0; }
+int showDialogBox(const char*, const char**, int, int, int, ColorWithFlags, const char*, ColorWithFlags, int) { return 1; }
+void muiNotify(const char*, MuiNoticeKind, const char*) {}
 static IosCrtModel model = IosCrtModel::Off;
 static int choose = -1, switches = 0;
 static std::vector<std::pair<MuiRect,bool>> controls;
@@ -130,6 +146,29 @@ bool MuiContext::segmented(const std::string& id, const MuiRect& rect, const std
 } // fallout
 using namespace fallout;
 int main() {
+    Values defaults = defaultValues();
+    assert(defaults.highlightContainers && defaults.highlightCorpses && !defaults.highlightHiddenItems);
+    assert(defaults.scrollLimit && !defaults.gameMenuQuickActions);
+    assert(applyValues(defaults));
+    Values changed = defaults;
+    changed.highlightContainers = changed.highlightCorpses = false;
+    changed.highlightHiddenItems = changed.gameMenuQuickActions = true;
+    changed.scrollLimit = false;
+    assert(applyValues(changed));
+    assert(!settings.enhancements.highlight_containers && !settings.enhancements.highlight_corpses);
+    assert(settings.enhancements.highlight_hidden_items && settings.touch.game_menu_quick_actions);
+    assert(!scrollLimited && settings.ui.ignore_scroll_limit);
+    persistOk = false;
+    assert(!applyValues(defaults));
+    assert(!settings.enhancements.highlight_containers && !settings.enhancements.highlight_corpses);
+    assert(settings.enhancements.highlight_hidden_items && settings.touch.game_menu_quick_actions);
+    assert(!scrollLimited && settings.ui.ignore_scroll_limit);
+    persistOk = true;
+    assert(applyValues(defaults));
+    assert(settings.enhancements.highlight_containers && settings.enhancements.highlight_corpses);
+    assert(!settings.enhancements.highlight_hidden_items && !settings.touch.game_menu_quick_actions);
+    assert(scrollLimited && !settings.ui.ignore_scroll_limit);
+
     assert(model == IosCrtModel::Off);
     PreferencesScreen screen;
     for (const auto& row : screen.rows) if (row.textId == kTextFont) {
@@ -246,7 +285,7 @@ for owner, symbol, text in owners:
         source = path.read_bytes().decode('latin1')
         if path == ROOT / owner:
             source = source.replace(definition[0], '', 1)
-        assert not re.search(r'\b' + str(number) + r'\b', source), (symbol, number, path)
+        assert not re.search(r'(?<![\w.])' + str(number) + r'(?![\w.])', source), (symbol, number, path)
     custom_ids.append(number)
 assert len(set(custom_ids)) == len(custom_ids)
 # Check duplicate entries in every bundled translation.

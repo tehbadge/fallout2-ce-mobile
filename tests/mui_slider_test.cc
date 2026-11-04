@@ -6,6 +6,7 @@
 #include <cstdio>
 
 namespace fallout {
+SDL_Renderer* gSdlRenderer = nullptr;
 float muiTextWidth(const std::u32string& text, float size) { return text.size() * size * .6f; }
 void muiDrawTextAligned(const std::u32string&, const MuiRect&, float, MuiColor, MuiAlign, MuiAlign) {}
 void muiFillRoundRect(const MuiRect&, float, MuiColor) {}
@@ -240,5 +241,34 @@ int main() {
         event(PointerEventType::Up,cell.centerX(),cell.centerY());
         assert(selected==3);
     }
-    puts("PASS: 456 gesture cases across densities 1/2/3, scales 100/125/150/200%, mirrored landscape origins; CRT taps, scroll arbitration and iOS segmented bounds");
+    // A map finger remains map-owned when another finger presses the HUD.
+    {
+        struct HudScreen : MuiScreen { void build(MuiContext&) override {} } hud;
+        hud.modal = false;
+        gScreens.push_back(&hud);
+        gRegions = {{0, 0, 100, 100}};
+        gOutputWidth = gOutputHeight = 1000;
+        muiCancelTouches();
+        auto finger = [](Uint32 type, SDL_FingerID id, float x, float y) {
+            SDL_Event event {};
+            event.type = type;
+            event.tfinger.fingerId = id;
+            event.tfinger.x = x;
+            event.tfinger.y = y;
+            return muiHandleFingerEvent(&event);
+        };
+        assert(!finger(SDL_FINGERDOWN, 10, .8f, .8f));
+        assert(finger(SDL_FINGERDOWN, 20, .05f, .05f));
+        assert(!finger(SDL_FINGERMOTION, 10, .7f, .7f));
+        assert(!finger(SDL_FINGERUP, 10, .7f, .7f));
+        assert(gFingerCaptured && gCapturedFinger == 20);
+        assert(finger(SDL_FINGERUP, 20, .05f, .05f));
+        assert(!gFingerCaptured);
+        hud.modal = true;
+        assert(finger(SDL_FINGERMOTION, 30, .8f, .8f));
+        muiCancelTouches();
+        gScreens.clear();
+        gRegions.clear();
+    }
+    puts("PASS: independent map/HUD ownership; 456 gesture cases across densities 1/2/3, scales 100/125/150/200%, mirrored landscape origins; CRT taps, scroll arbitration and iOS segmented bounds");
 }

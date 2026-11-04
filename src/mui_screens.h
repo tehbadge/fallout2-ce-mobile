@@ -15,6 +15,18 @@ namespace fallout {
 
 struct InventoryTextPart;
 
+// The port's pages and its author's (the main menu, the about section).
+#ifdef __IPHONEOS__
+constexpr const char* kPortSourceUrl = "https://github.com/tehbadge/fallout2-ce-mobile";
+constexpr const char* kPortIssuesUrl = "https://github.com/tehbadge/fallout2-ce-mobile/issues";
+#else
+constexpr const char* kPortSourceUrl = "https://github.com/imbaner/fallout2-ce-mobile";
+constexpr const char* kPortIssuesUrl = "https://github.com/imbaner/fallout2-ce-mobile/issues";
+#endif
+constexpr const char* kPortTelegramUrl = "https://t.me/imbaner";
+constexpr const char* kPortYouTubeUrl = "https://www.youtube.com/@imbaner_dev";
+constexpr const char* kPortThanksUrl = "https://boosty.to/imbaner";
+
 // Parts shared by the mobile UI game screens (talk, barter, later loot and
 // inventory).
 
@@ -119,6 +131,11 @@ std::u32string muiPlaceText(int map, int elevation);
 // The same with names from [names] (MAP.MSG loaded by the caller: the game
 // loads it only for a game, not in the main menu).
 std::u32string muiPlaceText(int map, int elevation, MessageList* names);
+
+// The saves' import ([import]) or export, as the settings' "Game files" do
+// them (mui_preferences.cc): Android - the app's screen over the game; the
+// browser - its save exchange. The screen showing waits until it's back.
+void muiExchangeSaves(bool import);
 
 // Game menu (mui_options.cc) over what shows: continue, save and load if
 // [saveLoad], settings, exit; [place] in its header (the current map's if

@@ -9,8 +9,10 @@
 #include <jni.h>
 #endif
 
-#ifdef __IPHONEOS__
+#if defined(__IPHONEOS__)
 #include "platform/ios/display_metrics.h"
+#elif defined(__EMSCRIPTEN__)
+#include "platform/web/window.h"
 #endif
 
 #include "settings.h"
@@ -103,6 +105,8 @@ float hudGetScreenDensity()
         return std::min(geometry.pixelsPerPointX, geometry.pixelsPerPointY);
     }
     return 1.0f;
+#elif defined(__EMSCRIPTEN__)
+    return webScreenDensity();
 #else
     return 1.0f;
 #endif
@@ -184,6 +188,8 @@ static void hudGetSafeInsets(int insets[4])
 
     env->DeleteLocalRef(activityClass);
     env->DeleteLocalRef(activity);
+#elif defined(__EMSCRIPTEN__)
+    webSafeInsets(insets);
 #endif
 }
 

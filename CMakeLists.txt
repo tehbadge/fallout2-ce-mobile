@@ -64,6 +64,8 @@ target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DI
 # Shared engine sources — used by both game and mapper targets.
 # Excludes main.cc/main.h (game-only entry logic).
 set(FALLOUT_ENGINE_SOURCES
+    "src/app_update.cc"
+    "src/app_update.h"
     "src/actions.cc"
     "src/actions.h"
     "src/animation_defs.h"
@@ -163,6 +165,8 @@ set(FALLOUT_ENGINE_SOURCES
     "src/graph_lib.h"
     "src/heap.cc"
     "src/heap.h"
+    "src/hero_appearance.cc"
+    "src/hero_appearance.h"
     "src/input.cc"
     "src/input.h"
     "src/interface.cc"
@@ -395,7 +399,11 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/mui_movie.cc"
     "src/mui_character_selector.cc"
     "src/mui_elevator.cc"
+    "src/mui_hero_select.cc"
     "src/mui_main_menu.cc"
+    "src/mui_update.cc"
+    "src/mui_update.h"
+    "src/mui_licenses.cc"
     "src/mui_options.cc"
     "src/mui_scenes.cc"
     "src/mui_worldmap.cc"
@@ -428,6 +436,10 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/touch.h"
     "src/action_log.cc"
     "src/action_log.h"
+    "src/error_report.cc"
+    "src/error_report.h"
+    "src/app_version.cc"
+    "src/app_version.h"
     "src/touch_log.cc"
     "src/touch_log.h"
     "src/scan_unimplemented.cc"
@@ -476,7 +488,8 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_DIAGNOSTICS=$<BOOL
 
 # The version the app shows (Android: its versionName), CE's otherwise.
 set(FALLOUT_APP_VERSION "" CACHE STRING "Version shown in the settings' About section")
-if(FALLOUT_APP_VERSION)
+# The web page gives the engine its version (app_version.h).
+if(FALLOUT_APP_VERSION AND NOT EMSCRIPTEN)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE FALLOUT_APP_VERSION="${FALLOUT_APP_VERSION}")
 endif()
 
@@ -597,49 +610,7 @@ if((NOT ${CMAKE_SYSTEM_NAME} MATCHES "Emscripten"))
         find_package(SDL2)
     endif()
 else()
-    set( CMAKE_C_FLAGS                      "${CMAKE_C_FLAGS} \
-                                            --use-port=sdl2 \
-                                            --use-port=sdl2_mixer \
-                                            --use-port=zlib" )
-    set( CMAKE_CXX_FLAGS                    "${CMAKE_CXX_FLAGS} \
-                                            --use-port=sdl2 \
-                                            --use-port=sdl2_mixer \
-                                            --use-port=zlib \
-                                            -std=c++17" )
-
-
-    set( CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
-    set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-
-    set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O1")
-    set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O1")
-
-    if(OPTION_WASM_64)
-        target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sMEMORY64" )
-        set( CMAKE_C_FLAGS                      "${CMAKE_C_FLAGS} -sMEMORY64" )
-        set( CMAKE_CXX_FLAGS                    "${CMAKE_CXX_FLAGS} -sMEMORY64" )
-        add_compile_options( -sMEMORY64 )
-    endif()
-
-    if(OPTION_WASM_JSPI)
-        target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sJSPI" )
-    else()
-        target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sASYNCIFY" )
-        target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sASYNCIFY_STACK_SIZE=20480" )
-    endif()
-
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sENVIRONMENT=web" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sALLOW_MEMORY_GROWTH" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-MEMORY_GROWTH_LINEAR_STEP=32mb" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sNO_DISABLE_EXCEPTION_CATCHING" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-lidbfs.js" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sCASE_INSENSITIVE_FS" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sMODULARIZE" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sEXPORTED_RUNTIME_METHODS=callMain,addRunDependency,removeRunDependency" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sEXPORT_ALL" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sEXPORT_NAME=fallout2ce" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "-sEXIT_RUNTIME" )
-    target_link_options( ${EXECUTABLE_NAME} PRIVATE "$<$<CONFIG:DEBUG>:-g>" )
+    include("os/web/web.cmake")
 endif()
 
 
@@ -1034,6 +1005,19 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
         target_link_options(game_menu_quick_actions_settings_test PRIVATE -Wl,--gc-sections)
     endif()
 
+    add_executable(touch_interruptions_test EXCLUDE_FROM_ALL os/web/test_touch_interruptions.cc)
+    target_include_directories(touch_interruptions_test PRIVATE src ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(touch_interruptions_test PRIVATE ${SDL2_LIBRARIES})
+    target_compile_definitions(touch_interruptions_test PRIVATE FALLOUT_FORCE_TOUCH_ONLY=1)
+    target_compile_options(touch_interruptions_test PRIVATE -UNDEBUG -ffunction-sections -fdata-sections)
+    if(APPLE)
+        target_link_options(touch_interruptions_test PRIVATE -Wl,-dead_strip)
+    else()
+        target_link_options(touch_interruptions_test PRIVATE -Wl,--gc-sections)
+    endif()
+    add_dependencies(regression_tests touch_interruptions_test)
+    add_test(NAME touch_interruptions_test COMMAND touch_interruptions_test)
+
     # Tests the real immediate-mode input handlers with drawing stubs. Discard
     # unused engine entry points from the included mui.cc implementation.
     foreach(slider_test mui_slider_test mui_slider_ios_test)
@@ -1052,6 +1036,10 @@ if(UNIX AND NOT ANDROID AND NOT IOS AND NOT CMAKE_SYSTEM_NAME MATCHES "Emscripte
     target_compile_definitions(mui_slider_ios_test PRIVATE __IPHONEOS__=1 FALLOUT_FORCE_TOUCH_ONLY=1)
     # Source-extraction harnesses compile small fixtures, not the full game.
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME touch_view_policy_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/touch_view_policy_test.py)
+    add_test(NAME script_serialization_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/script_serialization_test.py)
     add_test(NAME equipment_drop_control_flow_test
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/equipment_drop_control_flow_test.py
             --cxx ${CMAKE_CXX_COMPILER} --output-dir ${CMAKE_CURRENT_BINARY_DIR}/equipment-test)

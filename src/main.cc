@@ -19,6 +19,7 @@
 #include "dev_autotest.h"
 #include "draw.h"
 #include "endgame.h"
+#include "error_report.h"
 #include "game.h"
 #include "game_commands.h"
 #include "game_mouse.h"
@@ -90,6 +91,8 @@ static bool commandLineDevEndgame = false;
 static bool commandLineDevNewGame = false;
 static const char* commandLineDevMap = nullptr;
 static bool commandLineDevEndgameMovie = false;
+// CE: `--dev-skip-opening-movies`, for this run only (settings unchanged).
+static bool commandLineDevSkipOpeningMovies = false;
 
 // 0x48099C
 int falloutMain(int argc, char** argv)
@@ -104,12 +107,16 @@ int falloutMain(int argc, char** argv)
 
     mainParseCommandLineArguments(argc, argv);
 
+    // CE: A previous run that ended unexpectedly is told in the main menu
+    // (error_report.h).
+    errorReportStart();
+
     // SFALL: Allow to skip intro movies
     int skipOpeningMovies = settings.ui.skip_opening_movies;
-    if (skipOpeningMovies < 1) {
-        gameMoviePlay(MOVIE_IPLOGO, GAME_MOVIE_FADE_IN);
-        gameMoviePlay(MOVIE_INTRO, 0);
-        gameMoviePlay(MOVIE_CREDITS, 0);
+    if (skipOpeningMovies < 1 && !commandLineDevSkipOpeningMovies) {
+        gameMoviePlay(MOVIE_IPLOGO, GameMovieFlags::FadeIn);
+        gameMoviePlay(MOVIE_INTRO, GameMovieFlags::None);
+        gameMoviePlay(MOVIE_CREDITS, GameMovieFlags::None);
     } else {
         // If the splash is shown but opening movies are skipped, fade it out
         // before the main menu starts its normal fade-in.
@@ -121,42 +128,44 @@ int falloutMain(int argc, char** argv)
         while (!done) {
             keyboardReset();
             if (!backgoundSoundIsPlaying()) {
-                _gsound_background_play_level_music(gameSoundGetMusicOverride("main_menu_music", "07desert"), GSOUND_LIMIT_BEFORE);
+                _gsound_background_play_level_music(gameSoundGetMusicOverride("main_menu_music", "07desert"), GameSoundReadLimitMode::LimitBefore);
             }
             mainMenuWindowUnhide(true);
+            // CE: A problem that brought the game here (error_report.h).
+            errorReportShowPending();
 
             mouseShowCursor();
             int devLoadGameSlot = commandLineDevLoadGameSlot;
             bool devNewGame = commandLineDevNewGame;
-            int mainMenuRc;
+            MainMenuOption mainMenuRc;
             if (devLoadGameSlot != -1) {
                 // CE: The dev start is used once (a new game asked for too
                 // would start after the loaded game ends).
                 commandLineDevLoadGameSlot = -1;
                 commandLineDevNewGame = false;
-                mainMenuRc = MAIN_MENU_LOAD_GAME;
+                mainMenuRc = MainMenuOption::LoadGame;
             } else if (devNewGame) {
                 commandLineDevNewGame = false;
-                mainMenuRc = MAIN_MENU_NEW_GAME;
+                mainMenuRc = MainMenuOption::NewGame;
             } else {
                 mainMenuRc = mainMenuWindowHandleEvents();
             }
             mouseHideCursor();
 
             switch (mainMenuRc) {
-            case MAIN_MENU_INTRO:
+            case MainMenuOption::Intro:
                 mainMenuWindowHide(true);
-                gameMoviePlay(MOVIE_INTRO, GAME_MOVIE_STOP_MUSIC);
-                gameMoviePlay(MOVIE_CREDITS, 0);
+                gameMoviePlay(MOVIE_INTRO, GameMovieFlags::StopMusic);
+                gameMoviePlay(MOVIE_CREDITS, GameMovieFlags::None);
                 break;
-            case MAIN_MENU_NEW_GAME: {
+            case MainMenuOption::NewGame: {
                 mainMenuBeginSubscreen();
                 // CE: `--dev-new-game` starts with default character.
                 if (devNewGame || characterSelectorOpen() == 2) {
                     mainMenuFinishSubscreen();
 
                     if (!devNewGame) {
-                        gameMoviePlay(MOVIE_ELDER, GAME_MOVIE_STOP_MUSIC);
+                        gameMoviePlay(MOVIE_ELDER, GameMovieFlags::StopMusic);
                     }
                     randomSeedPrerandom(-1);
 
@@ -190,8 +199,8 @@ int falloutMain(int argc, char** argv)
                 }
                 break;
             }
-            case MAIN_MENU_CONTINUE:
-            case MAIN_MENU_LOAD_GAME: {
+            case MainMenuOption::Continue:
+            case MainMenuOption::LoadGame: {
                 // CE: The mobile curtain covers the screen while a save loads
                 // (on a PC the menu's subscreen handling does).
                 int win = muiIsEnabled() ? mainCurtainShow() : -1;
@@ -205,9 +214,9 @@ int falloutMain(int argc, char** argv)
                 }
                 // CE: Continue of the mobile main menu loads the save
                 // made last without the load screen.
-                int loadGameRc = mainMenuRc == MAIN_MENU_CONTINUE
+                int loadGameRc = mainMenuRc == MainMenuOption::Continue
                     ? lsgContinueGame()
-                    : lsgLoadGame(LOAD_SAVE_MODE_FROM_MAIN_MENU);
+                    : lsgLoadGame(LoadSaveMode::FromMainMenu);
                 if (loadGameRc == -1) {
                     debugPrint("\n ** Error running LoadGame()! **\n");
                 }
@@ -235,38 +244,38 @@ int falloutMain(int argc, char** argv)
                 }
                 break;
             }
-            case MAIN_MENU_TIMEOUT:
+            case MainMenuOption::Timeout:
                 debugPrint("Main menu timed-out\n");
                 // FALLTHROUGH
-            case MAIN_MENU_SCREENSAVER:
+            case MainMenuOption::ScreenSaver:
                 mainMenuWindowHide(true);
-                gameMoviePlay(MOVIE_INTRO, GAME_MOVIE_PAUSE_MUSIC);
+                gameMoviePlay(MOVIE_INTRO, GameMovieFlags::PauseMusic);
                 break;
-            case MAIN_MENU_OPTIONS: {
+            case MainMenuOption::Options: {
                 mainMenuBeginSubscreen();
                 doPreferences(true);
                 mainMenuCancelSubscreen();
                 break;
             }
-            case MAIN_MENU_CREDITS:
+            case MainMenuOption::Credits:
                 mainMenuWindowHide(true);
                 creditsOpen("credits.txt", InterfaceFrameId::Invalid, false);
                 break;
-            case MAIN_MENU_QUOTES:
+            case MainMenuOption::Quotes:
                 // NOTE: There is a strange cmp at 0x480C50. Both operands are
                 // zero, set before the loop and do not modify afterwards. For
                 // clarity this condition is omitted.
                 mainMenuWindowHide(true);
                 creditsOpen("quotes.txt", InterfaceFrameId::Invalid, true);
                 break;
-            case MAIN_MENU_EXIT:
-            case -1:
+            case MainMenuOption::Exit:
+            case MainMenuOption::Invalid:
                 done = true;
                 mainMenuWindowHide(true);
                 mainMenuWindowFree();
                 backgroundSoundDelete();
                 break;
-            case MAIN_MENU_SELFRUN:
+            case MainMenuOption::SelfRun:
                 break;
             }
         }
@@ -316,6 +325,8 @@ static void mainParseCommandLineArguments(int argc, char** argv)
             commandLineDevEndgame = true;
         } else if (strcmp(argv[arg], "--dev-endgame-movie") == 0) {
             commandLineDevEndgameMovie = true;
+        } else if (strcmp(argv[arg], "--dev-skip-opening-movies") == 0) {
+            commandLineDevSkipOpeningMovies = true;
         }
     }
 }
@@ -375,7 +386,13 @@ static void mainRunDevEndgameMovieIfNeeded()
 // 0x480D0C
 static int main_reset_system()
 {
+    // Leaving a session consumes a return-to-menu request, but a process
+    // exit must survive gameReset (including the web file-manager handoff).
+    bool exitRequested = _game_user_wants_to_quit == GAME_QUIT_REQUEST_EXIT;
     gameReset();
+    if (exitRequested) {
+        _game_user_wants_to_quit = GAME_QUIT_REQUEST_EXIT;
+    }
 
     return 1;
 }
@@ -516,6 +533,9 @@ static void mainLoop()
 
         mapHandleTransition();
 
+        // CE: A map that didn't load (error_report.h).
+        errorReportShowPending();
+
         if (_main_game_paused != 0) {
             _main_game_paused = 0;
         }
@@ -590,7 +610,7 @@ static void showDeath()
                 break;
             }
 
-            while (mouseGetEvent() != 0) {
+            while (mouseGetEvent() != MouseButtonEvent::None) {
                 sharedFpsLimiter.mark();
 
                 inputGetInput();
@@ -657,7 +677,7 @@ static void showDeath()
             speechSetEndCallback(_main_death_voiceover_callback);
 
             unsigned int delay;
-            if (speechLoad(deathFileName, GSOUND_LOAD_NO_PLAY, GSOUND_STREAM, GSOUND_NO_LOOP) == -1) {
+            if (speechLoad(deathFileName, GameSoundReadLimitMode::LoadNoPlay, GameSoundStorageType::Stream, GameSoundLoopingMode::NoLoop) == -1) {
                 delay = 3000;
             } else {
                 delay = UINT_MAX;
@@ -690,7 +710,7 @@ static void showDeath()
 
             speechDelete();
 
-            while (mouseGetEvent() != 0) {
+            while (mouseGetEvent() != MouseButtonEvent::None) {
                 sharedFpsLimiter.mark();
 
                 inputGetInput();
